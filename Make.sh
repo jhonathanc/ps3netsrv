@@ -1,14 +1,8 @@
 #!/bin/bash
 
-if [ -f polarssl-1.3.2/bin/libpolarssl-linux.a ]
+if [ -f Makefile.linux ]
 then
-	mv polarssl-1.3.2/bin/libpolarssl-linux.a polarssl-1.3.2/library/libpolarssl.a
+	make -f Makefile.linux
+else
+	make
 fi
-
-if [ -f Makefile.linux ] 
-then
-	mv Makefile Makefile.win
-	mv Makefile.linux Makefile
-fi
-
-make

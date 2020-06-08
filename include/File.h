@@ -40,11 +40,12 @@ ps3netsrv-src-nvrbst information:
 EDIT: Also I didn't look into the g++ 4.8.1 problem much. If anyone knows why, able to confirm the problem, or has built ps3netsrv (origional or modified) with g++ 4.8.1 for win32 (and jb format games still work) then please let me know smile, thanks.
 */
 
-#ifdef POLARSSL
-#include <polarssl/aes.h>
-#else
-#include <mbedtls/aes.h>
-#endif
+//#ifdef POLARSSL
+//#include <polarssl/aes.h>
+//#else
+//#include <mbedtls/aes.h>
+//#endif
+#include "aes.h"
 #include "AbstractFile.h"
 
 
@@ -75,6 +76,7 @@ class File : public AbstractFile
 	/////////////////////////////////////////////////
 
 	file_t fp[64];
+	int64_t last_seek;
 	int8_t is_multipart;
 	int64_t part_size;
 	int8_t index;
