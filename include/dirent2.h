@@ -16,7 +16,7 @@
 *
 *   @file   dirent.h
 *
-*   @brief  The mingw version of dirent and friends doesn't include the 
+*   @brief  The mingw version of dirent and friends doesn't include the
 *           the d_type field. So we make our own version.
 *
 ****************************************************************************/
@@ -38,7 +38,7 @@ struct dirent2
 {
 	long            d_ino;      /* Always zero.     */
 	off_t           d_off;      /* Always zero.     */
-	unsigned short  d_reclen;   /* Always zero      */
+	unsigned short  d_namlen;
 	unsigned char   d_type;     /* Type of file     */
 	char            d_name[2048]; /* File name. */
 };
@@ -56,7 +56,7 @@ typedef struct
 	 */
 	struct  dirent2      dd_dirent;
 
-	/* dd_dirpattern contains the directory pattern that was passed to 
+	/* dd_dirpattern contains the directory pattern that was passed to
 	 * FindFirstFile.
 	 */
 	char               *dd_dirpattern;

@@ -10,7 +10,11 @@
 #define DPRINTF(...)
 #endif
 
-#ifdef __BIG_ENDIAN__
+#ifndef _OS_WINDOWS
+#include <endian.h>
+#define __BIG_ENDIAN__ (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#endif
+#if __BIG_ENDIAN__
 
 static inline uint16_t BE16(uint16_t x)
 {

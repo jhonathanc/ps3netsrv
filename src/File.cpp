@@ -1,8 +1,10 @@
 #include "File.h"
 
 #include <stdio.h>
+#include <string.h>
 #include <cstring>
 
+#include "aes.h"
 #include "common.h"
 #include "compat.h"
 
@@ -17,7 +19,7 @@ File::File() : enc_type_(kDiscTypeNone), region_count_(0), region_info_(NULL)
 {
 	fd = INVALID_FD;
 
-	is_multipart = index = 0;
+	last_seek = is_multipart = index = 0;
 	for(uint8_t i = 0; i < 64; i++) fp[i] = INVALID_FD;
 }
 
@@ -51,14 +53,22 @@ int File::open(const char *path, int flags)
 	init_region_info();
 
 	if(!path)
+	{
+		printf("file error: no path\n");
 		return FAILED;
+	}
 
 	if (FD_OK(fd))
 		this->close();
-	
+
+	last_seek = 0; // not for multi-iso
+
 	fd = open_file(path, flags);
 	if (!FD_OK(fd))
+	{
+		printf("file error: opening \"%s\"\n", path);
 		return FAILED;
+	}
 
 	// is multi part? (2015-2019 AV)
 	int plen = strlen(path), flen = plen - 6;
@@ -84,7 +94,7 @@ int File::open(const char *path, int flags)
 	}
 
 	// Encryption only makes sense for .iso or .ISO files in the .../PS3ISO/ folder so exit quick if req is is not related.
-	if (is_multipart || path_ps3iso_loc == NULL || path_ext_loc == NULL || path_ext_loc < path_ps3iso_loc)
+	if (is_multipart || (path_ps3iso_loc == NULL) || (path_ext_loc == NULL) || (path_ext_loc < path_ps3iso_loc))
 	{
 		// Clean-up old region_info_ (even-though it shouldn't be needed).
 		if (region_info_ != NULL)
@@ -98,7 +108,9 @@ int File::open(const char *path, int flags)
 		/////////////////////////////////////////////////
 		if(is_multipart)
 		{
-			char *filepath = (char *)malloc(plen + 2); strcpy(filepath, path);
+			char *filepath = (char *)malloc(plen + 2); if(!filepath) return FAILED;
+
+			strcpy(filepath, path);
 
 			file_stat_t st;
 			fstat_file(fd, &st); part_size = st.file_size; // all parts (except last) must be the same size of size of .iso.0
@@ -107,7 +119,7 @@ int File::open(const char *path, int flags)
 
 			for(int i = 1; i < 64; i++)
 			{
-				filepath[flen + 4] = 0; sprintf(filepath, "%s.%i", filepath, i);
+				sprintf(filepath + flen + 4, ".%i", i);
 
 				fp[i] = open_file(filepath, flags);
 				if (!FD_OK(fp[i])) break;
@@ -127,7 +139,7 @@ int File::open(const char *path, int flags)
 	/////////////////////////////////////////////////
 
 	file_t key_fd;
-	char key_path[path_ext_loc - path + 5 + 1];
+	char *key_path = new char[path_ext_loc - path + 5 + 1];
 	strncpy(key_path, path, path_ext_loc - path + 5);
 
 	// Check for redump encrypted mode by looking for the ".dkey" is the same path of the ".iso".
@@ -151,6 +163,8 @@ int File::open(const char *path, int flags)
 		key_fd = open_file(key_path, flags);
 	}
 
+	delete[] key_path;
+
 	// Check if key_path exists, and create the aes_dec_ context if so.
 	if (FD_OK(key_fd))
 	{
@@ -165,7 +179,7 @@ int File::open(const char *path, int flags)
 #else
 			if (mbedtls_aes_setkey_dec(&aes_dec_, key, 128) == SUCCEEDED)
 				enc_type_ = kDiscTypeRedump; // SET ENCRYPTION TYPE: Redump
-#endif			
+#endif
 		}
 		close_file(key_fd);
 	}
@@ -173,7 +187,7 @@ int File::open(const char *path, int flags)
 	// Store the ps3 information sectors.
 	file_stat_t st;
 	unsigned char sec0sec1[kSectorSize * 2] = {0};
-	if (fstat(&st) >= 0 && st.file_size >= kSectorSize * 2)
+	if ((fstat(&st) >= 0) && (st.file_size >= kSectorSize * 2))
 	{
 		// Restore the original position even-though we just opened, it should be at 0... (can be safe here, no performance worries for open).
 		int64_t initial_read_position = seek(0, SEEK_CUR);
@@ -198,7 +212,7 @@ int File::open(const char *path, int flags)
 				// Store the region information in address format.
 				region_info_[i].encrypted = (i % 2 == 1);
 				region_info_[i].regions_first_addr = (i == 0 ? 0LL : region_info_[i - 1].regions_last_addr + 1LL);
-				region_info_[i].regions_last_addr = static_cast<int64_t>(char_arr_BE_to_uint(sec0sec1 + 12 + (i * 4)) - (i % 2 == 1 ? 1LL : 0LL)) * kSectorSize + kSectorSize - 1LL;				
+				region_info_[i].regions_last_addr = static_cast<int64_t>(char_arr_BE_to_uint(sec0sec1 + 12 + (i * 4)) - (i % 2 == 1 ? 1LL : 0LL)) * kSectorSize + kSectorSize - 1LL;
 			}
 		}
 
@@ -213,13 +227,13 @@ int File::open(const char *path, int flags)
 		// The 3k3y watermarks located at 0xF70: (D|E)ncrypted 3K BLD.
 		static const unsigned char k3k3yEnWatermark[16]  = {0x45, 0x6E, 0x63, 0x72, 0x79, 0x70, 0x74, 0x65, 0x64, 0x20, 0x33, 0x4B, 0x20, 0x42, 0x4C, 0x44};
 		static const unsigned char k3k3yDecWatermark[16] = {0x44, 0x6E, 0x63, 0x72, 0x79, 0x70, 0x74, 0x65, 0x64, 0x20, 0x33, 0x4B, 0x20, 0x42, 0x4C, 0x44};
-		
+
 		if (memcmp(&k3k3yEnWatermark[0], &sec0sec1[0xF70], sizeof(k3k3yEnWatermark)) == SUCCEEDED)
 		{
 			// Grab the D1 from the 3k3y sector.
 			unsigned char key[16];
 			memcpy(key, &sec0sec1[0xF80], 0x10);
-  
+
 			// Convert D1 to KEY and generate the aes_dec_ context.
 			unsigned char key_d1[] = {0x38, 11, 0xcf, 11, 0x53, 0x45, 0x5b, 60, 120, 0x17, 0xab, 0x4f, 0xa3, 0xba, 0x90, 0xed};
 			unsigned char iv_d1[] = {0x69, 0x47, 0x47, 0x72, 0xaf, 0x6f, 0xda, 0xb3, 0x42, 0x74, 0x3a, 0xef, 170, 0x18, 0x62, 0x87};
@@ -236,7 +250,7 @@ int File::open(const char *path, int flags)
 				if (mbedtls_aes_crypt_cbc(&aes_d1, MBEDTLS_AES_ENCRYPT, 16, &iv_d1[0], key, key) == SUCCEEDED)
 					if (mbedtls_aes_setkey_dec(&aes_dec_, key, 128) == SUCCEEDED)
 						enc_type_ = kDiscType3k3yEnc; // SET ENCRYPTION TYPE: 3K3YEnc
-#endif						
+#endif
 		}
 		else if (memcmp(&k3k3yDecWatermark[0], &sec0sec1[0xF70], sizeof(k3k3yDecWatermark)) == SUCCEEDED)
 		{
@@ -252,7 +266,11 @@ int File::close(void)
 {
 	init_region_info();
 
-	int ret = (FD_OK(fd)) ? close_file(fd) : FAILED; fd = INVALID_FD;
+	int ret = (FD_OK(fd)) ? close_file(fd) : FAILED;
+
+	fd = INVALID_FD;
+
+	last_seek = 0;
 
 	if(!is_multipart)
 		return ret;
@@ -275,17 +293,23 @@ ssize_t File::read(void *buf, size_t nbyte)
 	if(!is_multipart)
 	{
 #ifdef NOSSL
-		return read_file(fd, buf, nbyte);
+		ssize_t ret = read_file(fd, buf, nbyte);
+		last_seek += ret;
+		return ret;
 #else
 		// In non-encrypted mode just do what is normally done.
-		if (enc_type_ == kDiscTypeNone || region_count_ == 0 || region_info_ == NULL)
+		if ((enc_type_ == kDiscTypeNone) || (region_count_ == 0) || (region_info_ == NULL))
 		{
-			return read_file(fd, buf, nbyte);
+			ssize_t ret = read_file(fd, buf, nbyte);
+			last_seek += ret;
+			return ret;
 		}
 
 		// read encrypted-3k3yredump-isos by NvrBst //
 		int64_t read_position = seek(0, SEEK_CUR);
 		ssize_t ret = read_file(fd, buf, nbyte);
+		last_seek += ret;
+
 		if (read_position < 0LL)
 		{
 			printf("ERROR: read > enc > seek: Returning decrypted data.\n");
@@ -293,9 +317,9 @@ ssize_t File::read(void *buf, size_t nbyte)
 		}
 
 		// If this is a 3k3y iso, and the 0xF70 data is being requests by ps3, we should null it out.
-		if (enc_type_ == kDiscType3k3yDec || enc_type_ == kDiscType3k3yEnc)
+		if ((enc_type_ == kDiscType3k3yDec) || (enc_type_ == kDiscType3k3yEnc))
 		{
-			if (read_position + ret >= 0xF70LL && read_position <= 0x1070LL)
+			if ((read_position + ret >= 0xF70LL) && (read_position <= 0x1070LL))
 			{
 				// Zero out the 0xF70 - 0x1070 overlap.
 				unsigned char *bufb = reinterpret_cast<unsigned char *>(buf);
@@ -313,7 +337,7 @@ ssize_t File::read(void *buf, size_t nbyte)
 		// Encrypted mode, check if the request lies in an encrypted range.
 		for (size_t i = 0; i < region_count_; ++i)
 		{
-			if (read_position >= region_info_[i].regions_first_addr && read_position <= region_info_[i].regions_last_addr)
+			if ((read_position >= region_info_[i].regions_first_addr) && (read_position <= region_info_[i].regions_last_addr))
 			{
 				// We found the region, decrypt if needed.
 				if (!region_info_[i].encrypted)
@@ -326,16 +350,23 @@ ssize_t File::read(void *buf, size_t nbyte)
 
 				// TODO(Temporary): Sanity check, we are assuming that reads always start at a beginning of a sector. And that all reads will be multiples of kSectorSize.
 				//				  Note: Both are easy fixes, but, code can be more simple + efficient if these two conditions are true (which they look to be from initial testing).
-				if (nbyte % kSectorSize != 0 || ret % kSectorSize != 0 || read_position % kSectorSize != 0)
+				if ((nbyte % kSectorSize != 0) || (ret % kSectorSize != 0) || (read_position % kSectorSize != 0))
 				{
-					printf("ERROR: encryption assumptions were not met, code needs to be updated, your game is probably about to crash: nbyte 0x%x, ret 0x%x, read_position 0x%I64x.\n", nbyte, ret, read_position);
+					printf("ERROR: encryption assumptions were not met, code needs to be updated, your game is probably about to crash: nbyte 0x%lx, ret 0x%lx, read_position 0x%lx.\n",
+						(unsigned long int)nbyte,
+						(unsigned long int)ret,
+						(unsigned long int)read_position);
 				}
 
 				return ret;
 			}
 		}
 
-		printf("ERROR: LBA request wasn't in the region_info_ for an encrypted iso? RP: 0x%I64x, RC: 0x%x, LR (0x%I64x-0x%I64x).\n", read_position, region_count_, region_count_ > 0 ? region_info_[region_count_ - 1].regions_first_addr : 0LL, region_count_ > 0 ? region_info_[region_count_ - 1].regions_last_addr : 0LL);
+		printf("ERROR: LBA request wasn't in the region_info_ for an encrypted iso? RP: 0x%lx, RC: 0x%lx, LR (0x%016llx-0x%016llx).\n",
+			(unsigned long int)read_position,
+			(unsigned long int)region_count_,
+			(unsigned long long int)((region_count_ > 0) ? region_info_[region_count_ - 1].regions_first_addr : 0),
+			(unsigned long long int)((region_count_ > 0) ? region_info_[region_count_ - 1].regions_last_addr  : 0));
 		return ret;
 #endif
 	}
@@ -343,10 +374,13 @@ ssize_t File::read(void *buf, size_t nbyte)
 	// read multi part iso (2015 AV)
 	ssize_t ret2 = 0, ret = read_file(fp[index], buf, nbyte);
 
-	if(ret < (ssize_t)nbyte && index < (is_multipart - 1))
+	// check if data is split between 2 parts
+	if ((ret < (ssize_t)nbyte) && ((index + 1) < is_multipart))
 	{
-		void *buf2 = (int8_t*)buf + ret;
-		ret2 = read_file(fp[index + 1], buf2, nbyte - ret); // data is split between 2 parts
+		index += 1;							// change default index to the next part
+		seek_file(fp[index], 0, SEEK_SET);	// reset seek pointer to beginning of the next part
+		void *buf2 = (int8_t*)buf + ret;	// complete filling the buffer
+		ret2 = read_file(fp[index], buf2, nbyte - ret);
 	}
 
 	return (ret + ret2);
@@ -355,16 +389,25 @@ ssize_t File::read(void *buf, size_t nbyte)
 ssize_t File::write(void *buf, size_t nbyte)
 {
 	if(!is_multipart)
+	{
+		last_seek += nbyte;
 		return write_file(fd, buf, nbyte);
+	}
 
-	// write multi part iso (2015 AV)
+	// write multi part iso (2015 AV) - may have issues
 	return write_file(fp[index], buf, nbyte);
 }
 
 int64_t File::seek(int64_t offset, int whence)
 {
-	if(!is_multipart || !part_size)
+	if ((!is_multipart) || (!part_size))
+	{
+		if(offset == last_seek) return SUCCEEDED;
+
+		last_seek = offset;
+
 		return seek_file(fd, offset, whence);
+	}
 
 	// seek multi part iso (2015 AV)
 	index = (int)(offset / part_size);
@@ -399,11 +442,11 @@ int File::fstat(file_stat_t *fs)
 // keystr_to_keyarr (&& asciischar_to_byte): Convert a hex string into a byte array.
 unsigned char File::asciischar_to_byte(char input)
 {
-	if(input >= '0' && input <= '9')
+	if ((input >= '0') && (input <= '9'))
 		return input - '0';
-	if(input >= 'A' && input <= 'F')
+	if ((input >= 'A') && (input <= 'F'))
 		return input - 'A' + 10;
-	if(input >= 'a' && input <= 'f')
+	if ((input >= 'a') && (input <= 'f'))
 		return input - 'a' + 10;
 
 	printf("ERROR: asciischar_to_byte.\n");
@@ -414,14 +457,14 @@ void File::keystr_to_keyarr(const char (&str)[32], unsigned char (&arr)[16])
 {
 	for (size_t i = 0; i < sizeof(arr); ++i)
 	{
-		arr[i] = asciischar_to_byte(str[i*2]) * 16 + asciischar_to_byte(str[i*2+1]);
+		arr[i] = (asciischar_to_byte(str[i * 2]) * 16) + asciischar_to_byte(str[(i * 2) + 1]);
 	}
 }
 
 // Convert 4 bytes in big-endian format, to an unsigned integer.
 unsigned int File::char_arr_BE_to_uint(unsigned char *arr)
 {
-	return arr[3] + 256*(arr[2] + 256*(arr[1] + 256*arr[0]));
+	return arr[3] + 256 * (arr[2] + 256 * (arr[1] + (256 * arr[0])));
 }
 
 // Reset the iv to a particular lba.

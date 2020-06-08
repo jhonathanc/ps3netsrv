@@ -64,7 +64,7 @@ scandir(const char *dirname,
 		int (*select)(const struct dirent2 *),
 		int (*compar)(const struct dirent2 **, const struct dirent2 **))
 {
-	int i, len;
+	int i, len, flen;
 	int used, allocated;
 	DIR2 *dir;
 	struct dirent2 *ent, *ent2;
@@ -83,7 +83,8 @@ scandir(const char *dirname,
 		if (select != NULL && !select(ent)) continue;
 
 		/* duplicate struct direct for this entry */
-		len = offsetof(struct dirent2, d_name) + strlen(ent->d_name) + 1;
+		flen = strlen(ent->d_name);
+		len = offsetof(struct dirent2, d_name) + flen + 1;
 		if ((ent2 = malloc(len)) == NULL) return FAILED;
 
 		if (used >= allocated)
@@ -93,6 +94,8 @@ scandir(const char *dirname,
 			if (!namelist)
 			goto error;
 		}
+
+		ent->d_namlen = flen;
 		memcpy(ent2, ent, len);
 		namelist[used++] = ent2;
 	}
@@ -107,6 +110,7 @@ scandir(const char *dirname,
 
 
 error:
+	closedir2(dir);
 	if (namelist)
 	{
 		for (i = 0; i < used; i++)

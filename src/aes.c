@@ -29,13 +29,13 @@
  *  http://csrc.nist.gov/publications/fips/fips197/fips-197.pdf
  */
 
-#include "polarssl/config.h"
+#include "config.h"
 
 #if defined(POLARSSL_AES_C)
 
-#include "polarssl/aes.h"
+#include "aes.h"
 #if defined(POLARSSL_PADLOCK_C)
-#include "polarssl/padlock.h"
+#include "padlock.h"
 #endif
 
 #if !defined(POLARSSL_AES_ALT)
@@ -339,10 +339,10 @@ static const uint32_t RCON[10] =
  * Forward S-box & tables
  */
 static unsigned char FSb[256];
-static uint32_t FT0[256]; 
-static uint32_t FT1[256]; 
-static uint32_t FT2[256]; 
-static uint32_t FT3[256]; 
+static uint32_t FT0[256];
+static uint32_t FT1[256];
+static uint32_t FT2[256];
+static uint32_t FT3[256];
 
 /*
  * Reverse S-box & tables
@@ -791,7 +791,7 @@ int aes_crypt_cbc( aes_context *ctx,
     {
         if( padlock_xcryptcbc( ctx, mode, length, iv, input, output ) == 0 )
             return( 0 );
-        
+
         // If padlock data misaligned, we just fall back to
         // unaccelerated mode
         //

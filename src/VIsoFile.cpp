@@ -32,8 +32,8 @@ extern "C" int scandir(const char *dirname, struct dirent2 ***ret_namelist,
 #define TEMP_BUF_SIZE	( 4*1024*1024)
 #define FS_BUF_SIZE		(32*1024*1024)
 
-#define SECTOR_SIZE		0x800
-#define SECTOR_MASK		0x7FF
+#define SECTOR_SIZE		0x800ULL
+#define SECTOR_MASK		0x7FFULL
 
 static const int FAILED		= -1;
 static const int SUCCEEDED	=  0;
@@ -41,59 +41,63 @@ static const int NONE		= -1;
 
 static inline uint32_t bytesToSectors(off64_t size)
 {
-	return ((size + 0x7ffULL) & ~0x7ffULL) / 0x800ULL;
+	return ((size + SECTOR_MASK) & ~SECTOR_MASK) / SECTOR_SIZE;
 }
 
-static char *dupString(const char *str)
+static char *dupString(const char *str, uint16_t len)
 {
-	char *ret = new char[strlen(str) + 1]; if(!ret) return NULL;
+	char *ret = new char[len + 1]; if(!ret) return NULL;
 	strcpy(ret, str);
 	return ret;
 }
 
-static size_t strncpy_upper(char *s1, const char *s2, size_t n)
+static uint8_t strncpy_upper(char *s1, const char *s2, uint8_t n)
 {
-	strncpy(s1, s2, n);
+	if ((!s1) || (!s2)) return 0;
 
-	for (size_t i = 0; i < n; i++)
+	for (uint8_t i = 0; i < n; i++)
 	{
-		if (s1[i] == 0)
+		s1[i] = s2[i];
+
+		if (s2[i] == 0)
 			return i;
 
-		if (s1[i] >= 'a' && s1[i] <= 'z')
+		if ((s1[i] >= 'a') && (s1[i] <= 'z'))
 		{
-			s1[i] = s1[i] - ('a'-'A');
+			s1[i] -= ('a'-'A');
 		}
 	}
 
 	return n;
 }
 
-static char *createPath(int dir_len, char *dir, int file_len, char *file)
+static char *createPath(uint16_t dlen, const char *dir, uint16_t flen, const char *file)
 {
-	char *ret = new char[dir_len + file_len + 2];
+	char *ret = new char[dlen + flen + 2];
 	sprintf(ret, "%s/%s", dir, file);
 	return ret;
 }
 
-static bool getFileSizeAndProcessMultipart(char *file, off64_t *size, bool multipart)
+static bool getFileSizeAndProcessMultipart(char *file, off64_t *size, bool multipart, uint16_t len)
 {
 	file_stat_t statbuf;
 
 	if (stat_file(file, &statbuf) < 0)
 		return false;
 
-	*size = statbuf.file_size; 
-	
+	*size = statbuf.file_size;
+
 	if(!multipart) return true;
 
-	char *p = strrchr(file, '.');
-	if (!p || strcmp(p + 1, "66600") != SUCCEEDED)
+	if(len < 6) return true;
+
+	char *p = file + len - 6;
+	if ((!p) || (strcmp(p + 1, ".66600") != SUCCEEDED))
 		return true;
 
-	off64_t prev_size;
+	off64_t prev_size = 0;
 
-	for (int i = 1; ; i++)
+	for (int i = 1; i < 100 ; i++)
 	{
 		p[4] = '0' + (i / 10);
 		p[5] = '0' + (i % 10);
@@ -121,10 +125,10 @@ static bool getFileSizeAndProcessMultipart(char *file, off64_t *size, bool multi
 static void genIso9660Time(time_t t, Iso9660DirectoryRecord *record)
 {
 	struct tm *timeinfo = localtime(&t);
-	record->year = timeinfo->tm_year;
-	record->month = timeinfo->tm_mon+1;
-	record->day = timeinfo->tm_mday;
-	record->hour = timeinfo->tm_hour;
+	record->year   = timeinfo->tm_year;
+	record->month  = timeinfo->tm_mon + 1;
+	record->day    = timeinfo->tm_mday;
+	record->hour   = timeinfo->tm_hour;
 	record->minute = timeinfo->tm_min;
 	record->second = timeinfo->tm_sec;
 }
@@ -132,23 +136,23 @@ static void genIso9660Time(time_t t, Iso9660DirectoryRecord *record)
 static void genIso9660TimePvd(time_t t, char *volumeTime)
 {
 	struct tm *timeinfo = localtime(&t);
-	int year = timeinfo->tm_year + 1900;
-	int month = timeinfo->tm_mon + 1;
+	int year  = timeinfo->tm_year + 1900;
+	int month = timeinfo->tm_mon  + 1;
 
-	volumeTime[0] = (year/1000);
-	volumeTime[1] = (year - (volumeTime[0]*1000)) / 100;
-	volumeTime[2] = (year - (volumeTime[0]*1000) - (volumeTime[1]*100)) / 10;
-	volumeTime[3] = year % 10;
-	volumeTime[4] = (month >= 10) ? 1 : 0;
-	volumeTime[5] = month%10;
-	volumeTime[6] = timeinfo->tm_mday / 10;
-	volumeTime[7] = timeinfo->tm_mday % 10;
-	volumeTime[8] = timeinfo->tm_hour / 10;
-	volumeTime[9] = timeinfo->tm_hour % 10;
-	volumeTime[10] = timeinfo->tm_min / 10;
-	volumeTime[11] = timeinfo->tm_min % 10;
-	volumeTime[12] = timeinfo->tm_sec / 10;
-	volumeTime[13] = timeinfo->tm_sec % 10;
+	volumeTime[0]  = (year / 1000) & 0xF;
+	volumeTime[1]  = ((year - (volumeTime[0] * 1000)) / 100) & 0xF;
+	volumeTime[2]  = ((year - (volumeTime[0] * 1000) - (volumeTime[1] * 100)) / 10) & 0xF;
+	volumeTime[3]  = year  % 10;
+	volumeTime[4]  = (month >= 10) ? 1 : 0;
+	volumeTime[5]  = month % 10;
+	volumeTime[6]  = (timeinfo->tm_mday / 10) & 0xF;
+	volumeTime[7]  = (timeinfo->tm_mday % 10);
+	volumeTime[8]  = (timeinfo->tm_hour / 10) & 0xF;
+	volumeTime[9]  = (timeinfo->tm_hour % 10);
+	volumeTime[10] = (timeinfo->tm_min  / 10) & 0xF;
+	volumeTime[11] = (timeinfo->tm_min  % 10);
+	volumeTime[12] = (timeinfo->tm_sec  / 10) & 0xF;
+	volumeTime[13] = (timeinfo->tm_sec  % 10);
 	volumeTime[14] = volumeTime[15] = volumeTime[16] = 0;
 
 	for (int i = 0; i < 16; i++)
@@ -160,10 +164,18 @@ static void genIso9660TimePvd(time_t t, char *volumeTime)
 static int get_ucs2_from_utf8(const unsigned char *input, const unsigned char **end_ptr)
 {
 	// We are not really getting utf8, but 8-bits local charset. We only support ansi in win32, atm
+	if(!input)
+	{
+		printf("viso error: no input in get_ucs2_from_utf8\n");
+		return FAILED;
+	}
 
 	*end_ptr = input;
 	if (input[0] == 0)
+	{
+		printf("viso error: blank input in get_ucs2_from_utf8\n");
 		return FAILED;
+	}
 
 	if (input[0] < 0x80)
 	{
@@ -179,9 +191,18 @@ static int get_ucs2_from_utf8(const unsigned char *input, const unsigned char **
 
 static int get_ucs2_from_utf8(const unsigned char * input, const unsigned char ** end_ptr)
 {
+	if(!input)
+	{
+		printf("viso error: no input in get_ucs2_from_utf8\n");
+		return FAILED;
+	}
+
 	*end_ptr = input;
 	if (input[0] == 0)
+	{
+		printf("viso error: blank input in get_ucs2_from_utf8\n");
 		return FAILED;
+	}
 
 	if (input[0] < 0x80)
 	{
@@ -191,45 +212,60 @@ static int get_ucs2_from_utf8(const unsigned char * input, const unsigned char *
 	if ((input[0] & 0xE0) == 0xC0)
 	{
 		if (input[1] == 0)
+		{
+			printf("viso error 0xE0: in get_ucs2_from_utf8\n");
 			return FAILED;
+		}
 
 		*end_ptr = input + 2;
 		return (input[0] & 0x1F)<<6 | (input[1] & 0x3F);
 	}
 	if ((input[0] & 0xF0) == 0xE0)
 	{
-		if (input[1] == 0 || input[2] == 0)
+		if ((input[1] == 0) || (input[2] == 0))
+		{
+			printf("viso error 0xF0: in get_ucs2_from_utf8\n");
 			return FAILED;
+		}
 
 		*end_ptr = input + 3;
 		return (input[0] & 0x0F)<<12 | (input[1] & 0x3F)<<6 | (input[2] & 0x3F);
 	}
 	if ((input[0] & 0xF8) == 0xF0)
 	{
-		if (input[1] == 0 || input[2] == 0 || input[3] == 0)
+		if ((input[1] == 0) || (input[2] == 0) || (input[3] == 0))
+		{
+			printf("viso error 0xF8: in get_ucs2_from_utf8\n");
 			return FAILED;
+		}
 
 		*end_ptr = input + 4;
 		return (input[0] & 0x07)<<18 | (input[1] & 0x3F)<<12 | (input[2] & 0x3F)<<6 | (input[3] & 0x3F);
 	}
 	if ((input[0] & 0xFC) == 0xF8)
 	{
-		if (input[1] == 0 || input[2] == 0 || input[3] == 0 || input[4] == 0)
+		if ((input[1] == 0) || (input[2] == 0) || (input[3] == 0) || (input[4] == 0))
+		{
+			printf("viso error 0xFC: in get_ucs2_from_utf8\n");
 			return FAILED;
+		}
 
 		*end_ptr = input + 4;
 		return (input[0] & 0x03)<<24 | (input[1] & 0x3F)<<18 | (input[2] & 0x3F)<<12 | (input[3] & 0x3F)<<6 | (input[4] & 0x3F);
 	}
 	if ((input[0] & 0xFE) == 0xFC)
 	{
-		if (input[1] == 0 || input[2] == 0 || input[3] == 0 || input[4] == 0 || input[5] == 0)
+		if ((input[1] == 0) || (input[2] == 0) || (input[3] == 0) || (input[4] == 0) || (input[5] == 0))
+		{
+			printf("viso error 0xFE: in get_ucs2_from_utf8\n");
 			return FAILED;
+		}
 
 		*end_ptr = input + 5;
 		return (input[0] & 0x01)<<30 | (input[1] & 0x3F)<<24 | (input[2] & 0x3F)<<18 | (input[3] & 0x3F)<<12 | (input[4] & 0x3F)<<6 | (input[5] & 0x3F);
 	}
 
-
+	printf("fatal viso error: in get_ucs2_from_utf8\n");
 	return FAILED;
 }
 
@@ -237,10 +273,12 @@ static int get_ucs2_from_utf8(const unsigned char * input, const unsigned char *
 
 static int utf8_to_ucs2(const unsigned char *utf8, uint16_t *ucs2, uint16_t maxLength)
 {
+	if((!utf8) || (!ucs2) || (!maxLength)) return 0;
+
 	const unsigned char *p = utf8;
 	int length = 0;
 
-	while (*p && length < maxLength)
+	while ((*p) && (length < maxLength))
 	{
 		int ch = get_ucs2_from_utf8(p, &p);
 		if (ch < 0)
@@ -257,10 +295,10 @@ static int utf8_to_ucs2(const unsigned char *utf8, uint16_t *ucs2, uint16_t maxL
 #include <wincrypt.h>
 static void get_rand(void *bfr, uint32_t size)
 {
-	HCRYPTPROV hProv;
-
 	if (size == 0)
 		return;
+
+	HCRYPTPROV hProv;
 
 	if (!CryptAcquireContext(&hProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
 		fprintf(stderr, "Error aquiring crypt context.\n");
@@ -273,10 +311,10 @@ static void get_rand(void *bfr, uint32_t size)
 #else
 static void get_rand(void *bfr, uint32_t size)
 {
-	FILE *fp;
-
 	if (size == 0)
 		return;
+
+	FILE *fp;
 
 	fp = fopen("/dev/urandom", "r");
 	if (fp == NULL)
@@ -291,6 +329,12 @@ static void get_rand(void *bfr, uint32_t size)
 
 static int parse_param_sfo(file_t fd, const char *field, char *field_value, int field_len)
 {
+	if ((!field) || (!field_len) || (!field_value) || (!field[0]))
+	{
+		printf("viso error: failed to parse PARAM.SFO\n");
+		return FAILED;
+	}
+
 	if (FD_OK(fd))
 	{
 		unsigned len, pos, str;
@@ -311,7 +355,7 @@ static int parse_param_sfo(file_t fd, const char *field, char *field_value, int 
 		read_file(fd, mem, len);
 		close_file(fd);
 
-		str = (mem[8] + (mem[9] << 8));
+		str = (mem[0x8] + (mem[0x9] << 8));
 		pos = (mem[0xc] + (mem[0xd] << 8));
 
 		int indx = 0;
@@ -323,6 +367,8 @@ static int parse_param_sfo(file_t fd, const char *field, char *field_value, int 
 
 			if (!strcmp((char *) &mem[str], field))
 			{
+				if (pos >= len) break;
+
 				strncpy(field_value, (char *) &mem[pos], field_len);
 				free(mem);
 				return SUCCEEDED;
@@ -337,11 +383,15 @@ static int parse_param_sfo(file_t fd, const char *field, char *field_value, int 
 			free(mem);
 	}
 
+	printf("viso error: failed to parse PARAM.SFO\n");
 	return FAILED;
 }
 
 static bool get_title_id(const char *dir, char *title_id)
 {
+	if ((!dir) || (!title_id))
+		return false;
+
 	char sfo_path[MAX_PATH];
 	snprintf(sfo_path, sizeof(sfo_path) - 1, "%s/PS3_GAME/PARAM.SFO", dir);
 
@@ -364,32 +414,32 @@ static bool get_title_id(const char *dir, char *title_id)
 
 static int select_directories(const struct dirent2 *entry)
 {
-	if ((strcmp(entry->d_name, ".") == SUCCEEDED) || (strcmp(entry->d_name, "..") == SUCCEEDED))
+	if(!entry)
+		return false;
+
+	if (entry->d_type & DT_DIR)
 	{
-		return 0;
-	}
-	else
-	{
-		if (entry->d_type == DT_DIR)
-			return 1;
+		if ((strcmp(entry->d_name, ".") == SUCCEEDED) || (strcmp(entry->d_name, "..") == SUCCEEDED))
+		{
+			return false;
+		}
+		return true;
 	}
 
-	return 0;
+	return false;
 }
 
 static int select_files(const struct dirent2 *entry)
 {
-	if ((strcmp(entry->d_name, ".") == SUCCEEDED) || (strcmp(entry->d_name, "..") == SUCCEEDED))
+	if(!entry)
+		return false;
+
+	if (entry->d_type & DT_DIR)
 	{
-		return 0;
-	}
-	else
-	{
-		if (entry->d_type != DT_DIR)
-			return 1;
+		return false;
 	}
 
-	return 0;
+	return true;
 }
 
 VIsoFile::VIsoFile(bool ps3Mode)
@@ -490,28 +540,31 @@ void VIsoFile::reset(void)
 		rootList = next;
 	}
 
-	vFilePtr = 0;
-	filesSizeSectors = 0;
-	dirsSizeSectors = 0;
+	vFilePtr              = 0;
+	filesSizeSectors      = 0;
+	dirsSizeSectors       = 0;
 	dirsSizeSectorsJoliet = 0;
-	pathTableSize = 0;
-	pathTableSizeJoliet = 0;
-	totalSize = 0;
-	padAreaStart = 0;
-	padAreaSize = 0;
+	pathTableSize         = 0;
+	pathTableSizeJoliet   = 0;
+	totalSize             = 0;
+	padAreaStart          = 0;
+	padAreaSize           = 0;
 }
 
 DirList *VIsoFile::getParent(DirList *dirList)
 {
-	DirList *tempList = rootList;
-	char *parentPath;
+	if(!dirList)
+		return dirList;
 
 	if (dirList == rootList)
 		return dirList;
 
-	parentPath = dupString(dirList->path); if(!parentPath) return dirList;
+	DirList *tempList = rootList;
 
-	char *slash = strrchr(parentPath + dirList->path_len - 1, '/'); if(slash) *slash = 0;
+	char *parentPath;
+	parentPath = dupString(dirList->path, dirList->full_len); if(!parentPath) return dirList;
+
+	char *slash = strrchr(parentPath + dirList->path_len, '/'); if(slash) *slash = 0;
 
 	while (tempList)
 	{
@@ -530,6 +583,8 @@ DirList *VIsoFile::getParent(DirList *dirList)
 
 bool VIsoFile::isDirectChild(DirList *dir, DirList *parentCheck)
 {
+	if ((!dir) || (!parentCheck)) return false;
+
 	if (strcmp(dir->path, parentCheck->path) == SUCCEEDED)
 		return false;
 
@@ -537,29 +592,29 @@ bool VIsoFile::isDirectChild(DirList *dir, DirList *parentCheck)
 	if (p != dir->path)
 		return false;
 
-	p += parentCheck->path_len + strlen(parentCheck->path + parentCheck->path_len - 1) + 1;
+	p += parentCheck->full_len + 1;
 	if (strchr(p, '/'))
 		return false;
 
 	return true;
 }
 
-Iso9660DirectoryRecord *VIsoFile::findDirRecord(char *dirName, Iso9660DirectoryRecord *parentRecord, size_t size, bool joliet)
+Iso9660DirectoryRecord *VIsoFile::findDirRecord(const char *dirName, Iso9660DirectoryRecord *parentRecord, size_t size, bool joliet)
 {
-	uint8_t *strCheck = new uint8_t[256]; if(!strCheck) return NULL;
+	uint8_t *strCheck = new uint8_t[256];
 	uint8_t *buf, *p;
 	uint32_t pos = 0;
-	int strCheckSize;
+	uint8_t strCheckSize;
 
 	memset(strCheck, 0, 256);
 
 	if (!joliet)
 	{
-		strCheckSize = strncpy_upper((char *)strCheck, dirName, MAX_ISONAME-2);
+		strCheckSize = strncpy_upper((char *)strCheck, dirName, MAX_ISONAME - 2);
 	}
 	else
 	{
-		strCheckSize = utf8_to_ucs2((const unsigned char *)dirName, (uint16_t *)strCheck, MAX_ISODIR/2) * 2;
+		strCheckSize = utf8_to_ucs2((const unsigned char *)dirName, (uint16_t *)strCheck, MAX_ISODIR / 2) * 2;
 	}
 
 	buf = p = (uint8_t *)parentRecord;
@@ -567,6 +622,8 @@ Iso9660DirectoryRecord *VIsoFile::findDirRecord(char *dirName, Iso9660DirectoryR
 	while ((p < (buf + size)))
 	{
 		Iso9660DirectoryRecord *current = (Iso9660DirectoryRecord *)p;
+
+		if(!current) break;
 
 		if (current->len_dr == 0)
 		{
@@ -580,7 +637,7 @@ Iso9660DirectoryRecord *VIsoFile::findDirRecord(char *dirName, Iso9660DirectoryR
 				break;
 		}
 
-		if (current->len_fi == strCheckSize && memcmp(&current->fi, strCheck, strCheckSize) == SUCCEEDED)
+		if ((current->len_fi == strCheckSize) && (memcmp(&current->fi, strCheck, strCheckSize) == SUCCEEDED))
 		{
 			delete[] strCheck;
 			return current;
@@ -604,7 +661,7 @@ uint8_t *VIsoFile::buildPathTable(bool msb, bool joliet, size_t *retSize)
 	memset(tempBuf, 0, tempBufSize);
 	p = tempBuf;
 	dirList = rootList;
-	while (dirList && i < 65536)
+	while ((dirList) && (i < 65536))
 	{
 		Iso9660PathTable *table = (Iso9660PathTable *)p;
 		Iso9660DirectoryRecord *record;
@@ -622,7 +679,7 @@ uint8_t *VIsoFile::buildPathTable(bool msb, bool joliet, size_t *retSize)
 		{
 			DirList *parent;
 
-			char *fileName = dirList->path + dirList->path_len; //strrchr(dirList->path, '/') + 1;
+			char *fileName = dirList->path + dirList->path_len + 1;
 
 			if (!joliet)
 			{
@@ -649,7 +706,7 @@ uint8_t *VIsoFile::buildPathTable(bool msb, bool joliet, size_t *retSize)
 		}
 
 		p += 8 + table->len_di;
-		if (table->len_di&1)
+		if (table->len_di & 1)
 			p++;
 
 		dirList = dirList->next;
@@ -657,7 +714,7 @@ uint8_t *VIsoFile::buildPathTable(bool msb, bool joliet, size_t *retSize)
 	}
 
 	*retSize = (p - tempBuf);
-	uint8_t *ret = new uint8_t[*retSize];
+	uint8_t *ret = new uint8_t[*retSize]; if(!ret) return 0;
 
 	memcpy(ret, tempBuf, *retSize);
 	return ret;
@@ -665,13 +722,19 @@ uint8_t *VIsoFile::buildPathTable(bool msb, bool joliet, size_t *retSize)
 
 bool VIsoFile::buildContent(DirList *dirList, bool joliet)
 {
+	if ((!tempBuf) || (!tempBufSize) || (!dirList)) return false;
+
 	Iso9660DirectoryRecord *record, *parentRecord = NULL;
 	DirList *tempList, *parent;
 	uint8_t *p = tempBuf;
 	file_stat_t statbuf;
 
-	memset(tempBuf, 0, tempBufSize);
 	parent = getParent(dirList);
+
+	if (!parent)
+		return false;
+
+	memset(tempBuf, 0, tempBufSize);
 
 	// . entry
 	record = (Iso9660DirectoryRecord *)p;
@@ -747,7 +810,13 @@ bool VIsoFile::buildContent(DirList *dirList, bool joliet)
 			}
 			else
 			{
-				char *s = new char[strlen(fileList->path) + 7];
+				char *s = new char[fileList->path_len + fileList->file_len + 8];
+				if(!s)
+				{
+					free(record);
+					return false;
+				}
+
 				sprintf(s, "%s.66600", fileList->path);
 
 				if (stat_file(s, &statbuf) < 0)
@@ -774,7 +843,7 @@ bool VIsoFile::buildContent(DirList *dirList, bool joliet)
 
 				if (i == parts - 1)
 				{
-					size = (fileList->size) - (i*MULTIEXTENT_PART_SIZE);
+					size = (fileList->size) - (i * MULTIEXTENT_PART_SIZE);
 					record->fileFlags = ISO_FILE;
 				}
 				else
@@ -791,20 +860,22 @@ bool VIsoFile::buildContent(DirList *dirList, bool joliet)
 			record->lsbVolSetSeqNum = LE16(1);
 			record->msbVolSetSeqNum = BE16(1);
 
-			char *fileName = strrchr(fileList->path, '/') + 1;
+			char *fileName = fileList->path + fileList->path_len + 1;
 
-			char *s = new char[strlen(fileName) + 3];
-			strcpy(s, fileName);
-			strcat(s, ";1");
 			if (!joliet)
 			{
-				record->len_fi = strncpy_upper(&record->fi, s, MAX_ISONAME - 2);
+				record->len_fi = strncpy_upper(&record->fi, fileName, MAX_ISONAME - 2);
+				strcat(&record->fi + record->len_fi, ";1");
+				record->len_fi += 2;
 			}
 			else
 			{
-				record->len_fi = utf8_to_ucs2((const unsigned char *)s, (uint16_t *)&record->fi, MAX_ISONAME/2) * 2;
+				uint16_t len = fileList->file_len;
+				char *s = new char[len  + 3];
+				strcpy(s, fileName); strcpy(s + len, ";1");
+				record->len_fi = utf8_to_ucs2((const unsigned char *)s, (uint16_t *)&record->fi, MAX_ISONAME / 2) * 2;
+				delete[] s;
 			}
-			delete[] s;
 
 			record->len_dr = 0x27 + record->len_fi;
 			if (record->len_dr & 1)
@@ -812,7 +883,7 @@ bool VIsoFile::buildContent(DirList *dirList, bool joliet)
 				record->len_dr++;
 			}
 
-			offs = (p-tempBuf);
+			offs = (p - tempBuf);
 
 			if ((offs / SECTOR_SIZE) < ((offs + record->len_dr) / SECTOR_SIZE))
 			{
@@ -820,7 +891,7 @@ bool VIsoFile::buildContent(DirList *dirList, bool joliet)
 				p = (tempBuf + offs);
 			}
 
-			if ((p + record->len_dr) >= (tempBuf+tempBufSize))
+			if ((p + record->len_dr) >= (tempBuf + tempBufSize))
 			{
 				free(record);
 				return false;
@@ -855,7 +926,7 @@ bool VIsoFile::buildContent(DirList *dirList, bool joliet)
 			record->lsbVolSetSeqNum = LE16(1);
 			record->msbVolSetSeqNum = BE16(1);
 
-			char *fileName = strrchr(tempList->path, '/') + 1;
+			char *fileName = tempList->path + tempList->path_len + 1;
 
 			if (!joliet)
 			{
@@ -863,24 +934,24 @@ bool VIsoFile::buildContent(DirList *dirList, bool joliet)
 			}
 			else
 			{
-				record->len_fi = utf8_to_ucs2((const unsigned char *)fileName, (uint16_t *)&record->fi, MAX_ISODIR/2) * 2;
+				record->len_fi = utf8_to_ucs2((const unsigned char *)fileName, (uint16_t *)&record->fi, MAX_ISODIR / 2) * 2;
 			}
 
 			record->len_dr = 0x27 + record->len_fi;
-			if (record->len_dr&1)
+			if (record->len_dr & 1)
 			{
 				record->len_dr++;
 			}
 
-			offs = (p-tempBuf);
+			offs = (p - tempBuf);
 
-			if ((offs / SECTOR_SIZE) < ((offs+record->len_dr) / SECTOR_SIZE))
+			if ((offs / SECTOR_SIZE) < ((offs + record->len_dr) / SECTOR_SIZE))
 			{
 				offs = (offs + SECTOR_MASK) & ~SECTOR_MASK;
 				p = (tempBuf + offs);
 			}
 
-			if ((p+record->len_dr) >= (tempBuf+tempBufSize))
+			if ((p + record->len_dr) >= (tempBuf + tempBufSize))
 			{
 				free(record);
 				return false;
@@ -897,7 +968,14 @@ bool VIsoFile::buildContent(DirList *dirList, bool joliet)
 	size_t size = (p - tempBuf);
 	size = (size + SECTOR_MASK) & ~SECTOR_MASK;
 
+	if (size > tempBufSize)
+	{
+		if(record) free(record);
+		return false;
+	}
+
 	p = new uint8_t[size];
+	if(!p) {if(record) free(record); return false;}
 	memcpy(p, tempBuf, size);
 
 	record = (Iso9660DirectoryRecord *)p;
@@ -914,7 +992,7 @@ bool VIsoFile::buildContent(DirList *dirList, bool joliet)
 	}
 	else
 	{
-		Iso9660DirectoryRecord *childRecord = findDirRecord(strrchr(dirList->path, '/') + 1, parentRecord, (joliet) ? parent->contentJolietSize : parent->contentSize, joliet);
+		Iso9660DirectoryRecord *childRecord = findDirRecord(dirList->path + dirList->path_len + 1, parentRecord, (joliet) ? parent->contentJolietSize : parent->contentSize, joliet);
 		if (!childRecord)
 		{
 			delete[] p;
@@ -950,15 +1028,15 @@ void VIsoFile::fixDirLba(Iso9660DirectoryRecord *record, size_t size, uint32_t d
 
 	buf = p = (uint8_t *)record;
 
-	while ((p < (buf+size)))
+	while ((p < (buf + size)))
 	{
 		Iso9660DirectoryRecord *current = (Iso9660DirectoryRecord *)p;
 
 		if (current->len_dr == 0)
 		{
-			p += (SECTOR_SIZE - (pos & SECTOR_MASK));
+			p   += (SECTOR_SIZE - (pos & SECTOR_MASK));
 			pos += (SECTOR_SIZE - (pos & SECTOR_MASK));
-			if (p >= (buf+size))
+			if (p >= (buf + size))
 				break;
 
 			current = (Iso9660DirectoryRecord *)p;
@@ -986,21 +1064,21 @@ void VIsoFile::fixPathTableLba(uint8_t *pathTable, size_t size, uint32_t dirLba,
 {
 	uint8_t *p = pathTable;
 
-	while ((p < (pathTable+size)))
+	while ((p < (pathTable + size)))
 	{
 		Iso9660PathTable *table = (Iso9660PathTable *)p;
 
 		if (msb)
 		{
-			table->dirLocation = BE32(BE32(table->dirLocation)+dirLba);
+			table->dirLocation = BE32(BE32(table->dirLocation) + dirLba);
 		}
 		else
 		{
-			table->dirLocation = LE32(LE32(table->dirLocation)+dirLba);
+			table->dirLocation = LE32(LE32(table->dirLocation) + dirLba);
 		}
 
-		p = p+8+table->len_di;
-		if (table->len_di&1)
+		p = p + 8 + table->len_di;
+		if (table->len_di & 1)
 			p++;
 	}
 }
@@ -1022,19 +1100,22 @@ void VIsoFile::fixLba(uint32_t isoLba, uint32_t jolietLba, uint32_t filesLba)
 	fixPathTableLba(pathTableJolietM, pathTableSizeJoliet, jolietLba, true);
 }
 
-bool VIsoFile::build(char *inDir)
+bool VIsoFile::build(const char *inDir)
 {
-	DirList *dirList, *tail;
-	struct dirent2 **dirs;
-	int dir_len;
-	int name_len;
-	int ext_pos;
-	int count;
-	int idx = 0;
+	uint16_t dlen = strlen(inDir); if(dlen < 1) return false;
 
 	rootList = new DirList;
-	rootList->path = dupString(inDir);
-	rootList->path_len = strlen(inDir) + 1;
+	if(!rootList) return false;
+
+	DirList *dirList, *tail;
+	struct dirent2 **dirs;
+	int count;
+	int idx = 0;
+	uint16_t flen;
+
+	rootList->path = dupString(inDir, dlen); if(rootList->path == NULL) return false;
+	rootList->path_len = dlen;
+	rootList->full_len = dlen;
 	rootList->content = NULL;
 	rootList->contentJoliet = NULL;
 	rootList->fileList = NULL;
@@ -1042,24 +1123,24 @@ bool VIsoFile::build(char *inDir)
 	rootList->next = NULL;
 	dirList = tail = rootList;
 
-	if(!rootList->path) return false;
-
 	while (dirList)
 	{
-		dir_len = strlen(dirList->path);
-		if(dir_len)
-			count = scandir(dirList->path, &dirs, select_directories, alphasort);
-		else
-			count = NONE;
-
+		count = scandir(dirList->path, &dirs, select_directories, alphasort);
 		if (count < 0)
 			return false;
 
+		dlen = dirList->full_len;
 		for (int i = 0; i < count; i++)
 		{
+			#ifdef WIN32
+			flen = dirs[i]->d_namlen;
+			#else
+			flen = strlen(dirs[i]->d_name);
+			#endif
 			tail = tail->next = new DirList;
-			tail->path = createPath(dir_len, dirList->path, strlen(dirs[i]->d_name), dirs[i]->d_name);
-			tail->path_len = dir_len + 1;
+			tail->path = createPath(dlen, dirList->path, flen, dirs[i]->d_name);
+			tail->path_len = dlen;
+			tail->full_len = dlen + flen + 1;
 			tail->content = NULL;
 			tail->contentJoliet = NULL;
 			tail->idx = idx++;
@@ -1069,7 +1150,7 @@ bool VIsoFile::build(char *inDir)
 			free(dirs[i]);
 		}
 
-		free(dirs);
+		if(dirs) free(dirs);
 		dirList = dirList->next;
 	}
 
@@ -1079,12 +1160,14 @@ bool VIsoFile::build(char *inDir)
 		struct dirent2 **files;
 		FileList *fileList = NULL;
 		bool error = false;
+		uint16_t dlen;
 
-		dir_len = strlen(dirList->path);
-		if(dir_len)
-			count = scandir(dirList->path, &files, select_files, alphasort);
+		count = scandir(dirList->path, &files, select_files, alphasort);
+
+		if(files)
+			dlen = dirList->full_len;
 		else
-			count = NONE;
+			dlen = count = 0;
 
 		for (int i = 0; i < count; i++)
 		{
@@ -1092,17 +1175,21 @@ bool VIsoFile::build(char *inDir)
 			{
 				bool multipart = false;
 
-				name_len = strlen(files[i]->d_name);
-				ext_pos = name_len - 6; if(ext_pos < 1) ext_pos = 0;
+				#ifdef WIN32
+				flen = files[i]->d_namlen;
+				#else
+				flen = strlen(files[i]->d_name);
+				#endif
 
-				char *p = files[i]->d_name + ext_pos;
-				if (p && p[0] == '.')
+				if(flen > 6)
 				{
-					if (p[1] == '6' && p[2] == '6' && p[3] == '6' && isdigit(p[4]) && isdigit(p[5]))
+					char *p = files[i]->d_name + flen - 6;
+
+					if ((p[0] == '.') && (p[1] == '6') && (p[2] == '6') && (p[3] == '6') && (isdigit(p[4])) && (isdigit(p[5])))
 					{
 						multipart = true;
 
-						if (p[4] != '0' || p[5] != '0')
+						if ((p[4] != '0') || (p[5] != '0'))
 						{
 							free(files[i]);
 							continue;
@@ -1119,25 +1206,30 @@ bool VIsoFile::build(char *inDir)
 					fileList = fileList->next = new FileList;
 				}
 
-				fileList->path = createPath(dir_len, dirList->path, name_len, files[i]->d_name);
-				fileList->multipart = multipart;
-				fileList->next = NULL;
-
-				if (getFileSizeAndProcessMultipart(fileList->path, &fileList->size, multipart))
+				if(fileList)
 				{
-					fileList->rlba = filesSizeSectors;
-					filesSizeSectors += bytesToSectors(fileList->size);
+					fileList->path = createPath(dlen, dirList->path, flen, files[i]->d_name);
+					fileList->path_len = dlen;
+					fileList->file_len = flen;
+					fileList->multipart = multipart;
+					fileList->next = NULL;
+
+					if (getFileSizeAndProcessMultipart(fileList->path, &fileList->size, multipart, dlen + flen))
+					{
+						fileList->rlba = filesSizeSectors;
+						filesSizeSectors += bytesToSectors(fileList->size);
+					}
+					else
+						error = true;
 				}
 				else
-				{
 					error = true;
-				}
 			}
 
 			free(files[i]);
 		}
 
-		if (count >= 0)
+		if (files)
 			free(files);
 
 		if (error)
@@ -1206,14 +1298,14 @@ void VIsoFile::write(const char *volumeName, const char *gameCode)
 		// Sector 0
 		rangesSector->numRanges = BE32(1);
 		rangesSector->ranges[0].startSector = BE32(0);
-		rangesSector->ranges[0].endSector = BE32(volumeSize-1);
+		rangesSector->ranges[0].endSector = BE32(volumeSize - 1);
 
 		//Sector 1
 		strcpy(infoSector->consoleId, "PlayStation3");
 		memset(infoSector->productId, ' ', sizeof(infoSector->productId));
 		memcpy(infoSector->productId, gameCode, 4);
 		infoSector->productId[4] = '-';
-		strncpy(infoSector->productId+5, gameCode+4, 5);
+		strncpy(infoSector->productId + 5, gameCode + 4, 5);
 		get_rand(infoSector->info,  sizeof(infoSector->info));
 		get_rand(infoSector->hash, sizeof(infoSector->hash));
 	}
@@ -1227,9 +1319,8 @@ void VIsoFile::write(const char *volumeName, const char *gameCode)
 	pvd->VSStdVersion = 1;
 	memset(pvd->systemIdentifier, ' ', sizeof(pvd->systemIdentifier));
 
-	unsigned int vol_len = strncpy_upper(pvd->volumeIdentifier, volumeName, sizeof(pvd->volumeIdentifier));
-
-	for (unsigned int i = vol_len; i < sizeof(pvd->volumeIdentifier); i++)
+	uint8_t i = strncpy_upper(pvd->volumeIdentifier, volumeName, sizeof(pvd->volumeIdentifier));
+	for (; i < sizeof(pvd->volumeIdentifier); i++)
 	{
 		pvd->volumeIdentifier[i] = ' ';
 	}
@@ -1296,17 +1387,17 @@ void VIsoFile::write(const char *volumeName, const char *gameCode)
 	pvd->rootDirectoryRecord[0] = sizeof(pvd->rootDirectoryRecord);
 
 	// Write sector 18
-	p = fsBuf+0x9000;
+	p = fsBuf + 0x9000;
 	memset(p, 0, SECTOR_SIZE);
 	p[0] = 0xFF;
-	memcpy(p+1, "CD001", 5);
+	memcpy(p + 1, "CD001", 5);
 
 	// Write empty sector 19
 	p = fsBuf + 0x9800;
 	memset(p, 0, SECTOR_SIZE);
 
 	// Write pathTableL
-	p = fsBuf+0xA000;
+	p = fsBuf + 0xA000;
 	memset(p, 0, bytesToSectors(pathTableSize) * SECTOR_SIZE);
 	memcpy(p, pathTableL, pathTableSize);
 
@@ -1353,13 +1444,19 @@ void VIsoFile::write(const char *volumeName, const char *gameCode)
 	}
 }
 
-bool VIsoFile::generate(char *inDir, const char *volumeName, const char *gameCode)
+bool VIsoFile::generate(const char *inDir, const char *volumeName, const char *gameCode)
 {
-	off64_t padSectors;
-	bool ret;
+	if (stat_file(inDir, &st) != SUCCEEDED)
+	{
+		printf("viso error: path not found \"%s\"\n", inDir);
+		return FAILED;
+	}
 
 	tempBufSize = TEMP_BUF_SIZE;
 	tempBuf = new uint8_t[TEMP_BUF_SIZE]; if(!tempBuf) return false;
+
+	off64_t padSectors;
+	bool ret;
 
 	ret = build(inDir);
 	delete[] tempBuf;
@@ -1388,7 +1485,7 @@ bool VIsoFile::generate(char *inDir, const char *volumeName, const char *gameCod
 	if (fsBuf)
 		delete[] fsBuf;
 
-	fsBuf = new uint8_t[fsBufSize];
+	fsBuf = new uint8_t[fsBufSize]; if(!fsBuf) return false;
 	memset(fsBuf, 0, fsBufSize);
 
 	write(volumeName, gameCode);
@@ -1397,12 +1494,17 @@ bool VIsoFile::generate(char *inDir, const char *volumeName, const char *gameCod
 
 int VIsoFile::open(const char *path, int flags)
 {
-	file_stat_t st;
-	char gameCode[16];
-	char volumeName[32];
+	if(!path)
+	{
+		printf("viso error: no path in open\n");
+		return FAILED;
+	}
 
 	if (flags != O_RDONLY)
+	{
+		printf("viso error: flags not read only\n");
 		return FAILED;
+	}
 
 	if (fsBuf)
 	{
@@ -1411,18 +1513,26 @@ int VIsoFile::open(const char *path, int flags)
 
 	if (stat_file(path, &st) != SUCCEEDED)
 	{
+		printf("viso error: path not found \"%s\"\n", path);
 		return FAILED;
 	}
 
 	if ((st.mode & S_IFDIR) != S_IFDIR)
 	{
+		printf("viso error: not a directory \"%s\"\n", path);
 		return FAILED;
 	}
+
+	char gameCode[16];
+	char volumeName[32];
 
 	if (ps3Mode)
 	{
 		if (!get_title_id(path, gameCode))
+		{
+			printf("viso error: getting title id in PS3 MODE\n");
 			return FAILED;
+		}
 
 		strcpy(volumeName, "PS3VOLUME");
 	}
@@ -1439,7 +1549,10 @@ int VIsoFile::open(const char *path, int flags)
 	}
 
 	if (!generate((char *)path, volumeName, gameCode))
+	{
+		printf("viso error: failed to create virtual iso\n");
 		return FAILED;
+	}
 
 	return SUCCEEDED;
 }
@@ -1447,7 +1560,9 @@ int VIsoFile::open(const char *path, int flags)
 int VIsoFile::close(void)
 {
 	if (!fsBuf)
+	{
 		return FAILED;
+	}
 
 	reset();
 	return SUCCEEDED;
@@ -1455,32 +1570,42 @@ int VIsoFile::close(void)
 
 ssize_t VIsoFile::read(void *buf, size_t nbyte)
 {
+	if(!buf)
+	{
+		printf("viso error: no read buffer\n");
+		return FAILED;
+	}
+
 	DirList *dirList;
 	uint64_t remaining, to_read;
 	uint64_t r;
 	uint8_t *p;
 
 	if (!fsBuf)
+	{
+		printf("viso error: file error in read\n");
 		return FAILED;
+	}
 
 	remaining = nbyte;
 	r = 0;
 	p = (uint8_t *)buf;
 
-	if (vFilePtr >= totalSize || remaining == 0)
+	if ((vFilePtr >= totalSize) || (remaining == 0))
 	{
 		return SUCCEEDED;
 	}
 	else if (vFilePtr < 0)
 	{
+		printf("viso error: pointer error in read\n");
 		return FAILED;
 	}
 
-	if (vFilePtr < fsBufSize)
+	if (vFilePtr < (off64_t)fsBufSize)
 	{
 		// Read FS structure from RAM
-		to_read = MIN(fsBufSize - static_cast<uint64_t>(vFilePtr), remaining);
-		memcpy(p, fsBuf+vFilePtr, to_read);
+		to_read = MIN(fsBufSize - vFilePtr, remaining);
+		memcpy(p, fsBuf + vFilePtr, to_read);
 
 		remaining -= to_read;
 		r += to_read;
@@ -1488,7 +1613,7 @@ ssize_t VIsoFile::read(void *buf, size_t nbyte)
 		vFilePtr += to_read;
 	}
 
-	if (remaining == 0 || vFilePtr >= totalSize)
+	if ((remaining == 0) || (vFilePtr >= totalSize))
 		return r;
 
 	if (vFilePtr < padAreaStart)
@@ -1501,11 +1626,11 @@ ssize_t VIsoFile::read(void *buf, size_t nbyte)
 
 			while (fileList)
 			{
-				uint64_t fStart = (uint64_t)fsBufSize + (uint64_t)fileList->rlba * SECTOR_SIZE;
-				uint64_t fEnd = fStart + fileList->size;
-				uint64_t fEndSector = ((fEnd + 0x7ffULL) & ~0x7ffULL);
+				off64_t fStart = (uint64_t)fsBufSize + (uint64_t)fileList->rlba * SECTOR_SIZE;
+				off64_t fEnd = fStart + fileList->size;
+				off64_t fEndSector = ((fEnd + SECTOR_MASK) & ~SECTOR_MASK);
 
-				if (static_cast<uint64_t>(vFilePtr) >= fStart && static_cast<uint64_t>(vFilePtr) < fEndSector)
+				if ((vFilePtr >= fStart) && (vFilePtr < fEndSector))
 				{
 					if (fileList->multipart)
 					{
@@ -1513,12 +1638,12 @@ ssize_t VIsoFile::read(void *buf, size_t nbyte)
 						return r;
 					}
 
-					if (static_cast<uint64_t>(vFilePtr) < fEnd)
+					if (vFilePtr < fEnd)
 					{
 						file_t fd;
-						ssize_t this_r;
+						int64_t this_r;
 
-						to_read = MIN(fileList->size-(vFilePtr-fStart), remaining);
+						to_read = MIN((uint64_t)(fileList->size - (vFilePtr - fStart)), remaining);
 						fd = open_file(fileList->path, O_RDONLY);
 
 						if (!FD_OK(fd))
@@ -1527,7 +1652,7 @@ ssize_t VIsoFile::read(void *buf, size_t nbyte)
 							return r;
 						}
 
-						seek_file(fd, vFilePtr-fStart, SEEK_SET);
+						seek_file(fd, vFilePtr - fStart, SEEK_SET);
 						this_r = read_file(fd, p, to_read);
 						close_file(fd);
 
@@ -1537,7 +1662,7 @@ ssize_t VIsoFile::read(void *buf, size_t nbyte)
 							return r;
 						}
 
-						if (static_cast<size_t>(this_r) != to_read)
+						if (this_r != (int64_t)to_read)
 						{
 							fprintf(stderr, "VISO: read on file %s returned less data than expected (file modified?)\n", fileList->path);
 							return r;
@@ -1549,10 +1674,10 @@ ssize_t VIsoFile::read(void *buf, size_t nbyte)
 						vFilePtr += to_read;
 					}
 
-					if (remaining > 0 && fEnd != fEndSector)
+					if ((remaining > 0) && (fEnd != fEndSector))
 					{
 						// This is a zero area after the file to fill the sector
-						to_read = MIN((fEndSector-fEnd)-(vFilePtr-fEnd), remaining);
+						to_read = MIN((uint64_t)((fEndSector - fEnd) - (vFilePtr - fEnd)), remaining);
 						memset(p, 0, to_read);
 
 						remaining -= to_read;
@@ -1572,7 +1697,7 @@ ssize_t VIsoFile::read(void *buf, size_t nbyte)
 		}
 	}
 
-	if (vFilePtr >= padAreaStart && vFilePtr < totalSize)
+	if ((vFilePtr >= padAreaStart) && (vFilePtr < totalSize))
 	{
 		// Pad at the end
 		off64_t read_size = padAreaSize - (vFilePtr - padAreaStart);
@@ -1594,13 +1719,19 @@ ssize_t VIsoFile::read(void *buf, size_t nbyte)
 
 ssize_t VIsoFile::write(void *buf, size_t nbyte)
 {
+	(void) buf;
+	(void) nbyte;
+	printf("viso error: write error\n");
 	return FAILED;
 }
 
 int64_t VIsoFile::seek(int64_t offset, int whence)
 {
 	if (!fsBuf)
+	{
+		printf("viso error: seek error\n");
 		return FAILED;
+	}
 
 	if (whence == SEEK_SET)
 	{
@@ -1620,13 +1751,18 @@ int64_t VIsoFile::seek(int64_t offset, int whence)
 
 int VIsoFile::fstat(file_stat_t *fs)
 {
-	if (!fsBuf)
+	if ((!fsBuf) || (!fs))
+	{
+		printf("viso error: fstat error\n");
 		return FAILED;
+	}
 
 	fs->file_size = totalSize;
 	fs->mode = S_IFREG;
-	// FIXME: put the dates of the directory instead of this fixed value.
-	fs->mtime = fs->atime = fs->ctime = 0x526E3BE1;
+
+	fs->mtime = st.mtime;
+	fs->atime = st.atime;
+	fs->ctime = st.ctime;
 
 	return SUCCEEDED;
 }
