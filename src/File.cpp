@@ -402,10 +402,11 @@ int64_t File::seek(int64_t offset, int whence)
 {
 	if ((!is_multipart) || (!part_size))
 	{
+#ifdef WIN32	
 		if(offset == last_seek) return SUCCEEDED;
 
 		last_seek = offset;
-
+#endif
 		return seek_file(fd, offset, whence);
 	}
 
