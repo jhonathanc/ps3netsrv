@@ -10,6 +10,9 @@ CPPFLAGS += -Wall -Wno-format -I./include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_B
 #CFLAGS += -Doff64_t=off_t
 #CPPFLAGS += -Doff64_t=off_t
 
+#CFLAGS += -DOPT_FILE_SEEK
+#CPPFLAGS += -DOPT_FILE_SEEK
+
 #CFLAGS += -DNOSSL
 #CPPFLAGS +=-DNOSSL
 #OBJS = src/main.o src/compat.o src/File.o src/VIsoFile.o
