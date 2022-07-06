@@ -1,4 +1,5 @@
 #include "compat.h"
+#include "mem.h"
 
 static const int FAILED		= -1;
 static const int SUCCEEDED	=  0;

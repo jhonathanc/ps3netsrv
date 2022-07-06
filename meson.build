@@ -10,6 +10,7 @@ project('ps3netsrv', ['c', 'cpp'],
 
 ps3netsrv_inc = include_directories('include')
 ps3netsrv_src = files(
+  'src/mem.c',
   'src/compat.c',
   'src/File.cpp',
   'src/main.cpp',

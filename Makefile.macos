@@ -2,7 +2,7 @@ OS =  macos
 BUILD_TYPE = release
 
 OUTPUT := ps3netsrv
-OBJS = src/main.o src/padlock.o src/aes.o src/compat.o src/File.o src/VIsoFile.o
+OBJS = src/main.o src/padlock.o src/aes.o src/compat.o src/mem.o src/File.o src/VIsoFile.o
 
 CFLAGS = -Wall -I./include -std=gnu99 -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -DPOLARSSL
 CPPFLAGS += -Wall -I./include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -DPOLARSSL
@@ -12,7 +12,7 @@ CPPFLAGS += -Doff64_t=off_t
 
 #CFLAGS += -DNOSSL
 #CPPFLAGS +=-DNOSSL
-#OBJS = src/main.o src/compat.o src/File.o src/VIsoFile.o
+#OBJS = src/main.o src/compat.o src/mem.o src/File.o src/VIsoFile.o
 
 LDFLAGS = -L.
 LIBS = -lstdc++

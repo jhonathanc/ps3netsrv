@@ -78,7 +78,7 @@ class File : public AbstractFile
 	file_t fp[64];
 	int64_t last_seek;
 	int8_t is_multipart;
-	int64_t part_size;
+	uint64_t part_size;
 	int8_t index;
 
  public:

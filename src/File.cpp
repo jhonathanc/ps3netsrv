@@ -321,15 +321,15 @@ ssize_t File::read(void *buf, size_t nbyte)
 
 		// read encrypted-3k3yredump-isos by NvrBst //
 		int64_t read_position = seek(0, SEEK_CUR);
-		ssize_t ret = read_file(fd, buf, nbyte);
-
-		add_last_seek(ret);
-
 		if (read_position < 0LL)
 		{
 			printf("ERROR: read > enc > seek: Returning decrypted data.\n");
-			return ret;
+			return FAILED;
 		}
+
+		ssize_t ret = read_file(fd, buf, nbyte);
+
+		add_last_seek(ret);
 
 		// If this is a 3k3y iso, and the 0xF70 data is being requests by ps3, we should null it out.
 		if ((enc_type_ == kDiscType3k3yDec) || (enc_type_ == kDiscType3k3yEnc))
@@ -339,7 +339,7 @@ ssize_t File::read(void *buf, size_t nbyte)
 				// Zero out the 0xF70 - 0x1070 overlap.
 				unsigned char *bufb = reinterpret_cast<unsigned char *>(buf);
 				unsigned char *buf_overlap_start = read_position < 0xF70LL ? bufb + 0xF70LL - read_position : bufb;
-				memset(buf_overlap_start, 0x00, read_position + ret < 0x1070LL ? ret - (buf_overlap_start - bufb) : 0x100 - (buf_overlap_start - bufb));
+				_memset(buf_overlap_start, read_position + ret < 0x1070LL ? ret - (buf_overlap_start - bufb) : 0x100 - (buf_overlap_start - bufb));
 			}
 
 			// If it's a dec image then return, else go on to the decryption logic.
@@ -437,7 +437,7 @@ int File::fstat(file_stat_t *fs)
 		return fstat_file(fd, fs);
 
 	// fstat multi part (2015 AV) - return sum of size of iso parts
-	int64_t size = 0;
+	uint64_t size = 0;
 	file_stat_t statbuf;
 
 	for(uint8_t i = 0; i < is_multipart; i++)

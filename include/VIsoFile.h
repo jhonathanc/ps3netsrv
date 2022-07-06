@@ -89,9 +89,13 @@ private:
 	off64_t padAreaStart;
 	off64_t padAreaSize;
 
+	file_t fd;
 	file_stat_t st;
 
+	char *lastPath;
+
 	void reset(void);
+	void fd_reset(void);
 
 	DirList *getParent(DirList *dirList);
 	bool isDirectChild(DirList *dir, DirList *parentCheck);
