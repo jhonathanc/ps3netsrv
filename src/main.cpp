@@ -61,10 +61,13 @@ typedef struct _client_t
 	int subdirs;
 } client_t;
 
-static client_t clients[MAX_CLIENTS];
+int make_iso = VISO_NONE;
 
 static char root_directory[MAX_PATH_LEN];
+
+#ifndef MAKEISO
 static size_t root_len = 0;
+static client_t clients[MAX_CLIENTS];
 
 static int initialize_socket(uint16_t port)
 {
@@ -136,6 +139,8 @@ static int recv_all(int s, void *buf, int size)
 	return total_read;
 }
 #endif
+
+#endif // #ifndef MAKEISO
 
 static int normalize_path(char *path, int8_t del_last_slash)
 {
@@ -236,6 +241,120 @@ static void finalize_client(client_t *client)
 
 	memset(client, 0, sizeof(client_t));
 }
+
+static int create_iso(char *folder_path, char *fileout, int viso)
+{
+	int ret = FAILED;
+	char *filepath = NULL;
+	client_t client;
+
+	if(!folder_path || *folder_path == '\0' || !fileout || *fileout == '\0')
+	{
+		printf("ERROR: invalid path length for open command\n");
+		goto exit_function;
+	}
+
+	initialize_client(&client);
+
+	if(!client.buf)
+	{
+		printf("CRITICAL: memory allocation error\n");
+		goto exit_function;
+	}
+
+	filepath = (char *)malloc(MAX_PATH_LEN + strlen(folder_path) + 1);
+	if(!filepath)
+	{
+		printf("CRITICAL: memory allocation error\n");
+		goto exit_function;
+	}
+
+	strcpy(filepath, folder_path);
+
+	printf("output: %s\n", fileout);
+	client.wo_file = new File();
+
+	if(strstr(filepath, ".iso") || strstr(filepath, ".ISO"))
+	{
+		client.ro_file = new File();
+		viso = VISO_NONE;
+	}
+	else
+	{
+		printf("building virtual iso...\n");
+		client.ro_file = new VIsoFile((viso == VISO_PS3));
+	}
+
+	if(client.ro_file->open(filepath, O_RDONLY) < 0)
+	{
+		printf("open error on \"%s\" (viso=%d)\n", filepath, viso);
+
+		delete client.ro_file;
+		client.ro_file = NULL;
+		goto exit_function;
+	}
+	else
+	{
+		file_stat_t st;
+		if(client.ro_file->fstat(&st) < 0)
+		{
+			printf("fstat error on \"%s\" (viso=%d)\n", filepath, viso);
+
+			delete client.ro_file;
+			client.ro_file = NULL;
+			goto exit_function;
+		}
+		else
+		{
+			file_t fd_out;
+			fd_out = open_file(fileout, O_WRONLY|O_CREAT|O_TRUNC);
+			if (!FD_OK(fd_out))
+			{
+				printf("ERROR: create error on \"%s\"\n", filepath);
+				goto exit_function;
+			}
+			else
+			{
+				const uint32_t buf_size = 0x10000;
+				char *buffer = (char *)client.buf;
+				uint64_t offset = 0;
+				uint64_t rem_size = st.file_size % buf_size;
+				uint64_t iso_size = st.file_size - rem_size;
+				uint16_t count = 0x100;
+				if(iso_size >= buf_size)
+				{
+					for(; offset < iso_size; offset += buf_size)
+					{
+						if(++count >= 0x600) {count = 0; printf("Dumping ISO: offset %llu of %llu\n", (long long unsigned int)offset, (long long unsigned int)st.file_size);}
+						client.ro_file->read(buffer, buf_size);
+						write_file(fd_out, buffer, buf_size);
+					}
+				}
+				if(rem_size > 0)
+				{
+					printf("Dumping ISO: offset %llu of %llu\n", (long long unsigned int)offset, (long long unsigned int)st.file_size);
+					client.ro_file->read(buffer, rem_size);
+					write_file(fd_out, buffer, rem_size);
+				}
+				printf("Dumped ISO: %llu bytes\n", (long long unsigned int)st.file_size);
+			}
+
+			close_file(fd_out);
+
+			ret = SUCCEEDED;
+		}
+	}
+
+exit_function:
+
+	finalize_client(&client);
+	
+	if(filepath) free(filepath);
+
+	return ret;
+}
+
+#ifndef MAKEISO
 
 static char *translate_path(char *path, int *viso)
 {
@@ -496,7 +615,7 @@ static int process_open_cmd(client_t *client, netiso_open_cmd *cmd)
 	if((fp_len == 10) && (!strcmp(filepath, "/CLOSEFILE")))
 	{
 		ret = SUCCEEDED;
-		goto send_result; // return FAILED;
+		goto send_result; // return SUCCEEDED;
 	}
 
 	filepath = translate_path(filepath, &viso);
@@ -1659,19 +1778,26 @@ void *client_thread(void *arg)
 	finalize_client(client);
 	return NULL;
 }
+#endif //#ifndef MAKEISO
 
 int main(int argc, char *argv[])
 {
+#ifndef MAKEISO
 	int s;
 	uint16_t port = NETISO_PORT;
 	uint32_t whitelist_start = 0;
 	uint32_t whitelist_end   = 0;
+#endif
 
 	get_normal_color();
 
 	// Show build number
 	set_white_text();
-	printf("ps3netsrv build 20220813");
+#ifndef MAKEISO
+	printf("ps3netsrv build 20240210a");
+#else
+	printf("makeiso build 20240210a");
+#endif
 
 	set_red_text();
 	printf(" (mod by aldostools)\n");
@@ -1685,10 +1811,13 @@ int main(int argc, char *argv[])
 	}
 #endif
 
-	file_stat_t fs;
-
 	if(argc < 2)
 	{
+#ifdef MAKEISO
+		printf( "\nUsage: makeiso [directory/encrypted iso] [PS3/ISO]\n");
+		goto exit_error;
+#else
+		file_stat_t fs;
 		char *filename = strrchr(argv[0], '/');
 		if(!filename) filename = strrchr(argv[0], '\\');
 		if( filename) filename++;
@@ -1746,6 +1875,7 @@ int main(int argc, char *argv[])
 
 			goto exit_error;
 		}
+#endif //#ifdef MAKEISO
 	}
 
 	// Check shared directory
@@ -1758,6 +1888,23 @@ int main(int argc, char *argv[])
 	strcpy(root_directory, argv[1]);
 	normalize_path(root_directory, true);
 
+	if(argc < 3)
+	{
+		char sfo_path[sizeof(root_directory) + 20];
+		snprintf(sfo_path, sizeof(sfo_path) - 1, "%s/PS3_GAME/PARAM.SFO", root_directory);
+
+		file_stat_t fs;
+		if(stat_file(sfo_path, &fs) >= 0)
+			make_iso =  VISO_PS3;
+		else if(strstr(root_directory, ".iso") || strstr(root_directory, ".ISO"))
+			make_iso =  VISO_ISO;
+#ifdef MAKEISO
+		else
+			make_iso =  VISO_ISO;
+#endif
+	}
+
+#ifndef MAKEISO
 	// Use current path as default
 	if(*root_directory == 0)
 	{
@@ -1787,23 +1934,32 @@ int main(int argc, char *argv[])
 
 		if(sscanf(argv[2], "%u", &u) != 1)
 		{
-			printf("Wrong port specified.\n");
-			goto exit_error;
+			if(strstr(argv[2], "PS3") || strstr(argv[2], "ps3"))
+				make_iso = VISO_PS3;
+			else if(strstr(argv[2], "ISO") || strstr(argv[2], "iso"))
+				make_iso = VISO_ISO;
+			else
+			{
+				printf("Wrong port specified.\n");
+				goto exit_error;
+			}
 		}
-
+		else
+		{
 #ifdef WIN32
-		uint32_t min = 1;
+			uint32_t min = 1;
 #else
-		uint32_t min = 1024;
+			uint32_t min = 1024;
 #endif
 
-		if ((u < min) || (u > 65535))
-		{
-			printf("Port must be in %d-65535 range.\n", min);
-			goto exit_error;
-		}
+			if ((u < min) || (u > 65535))
+			{
+				printf("Port must be in %d-65535 range.\n", min);
+				goto exit_error;
+			}
 
-		port = u;
+			port = u;
+		}
 	}
 
 	// Parse whitelist argument
@@ -1885,6 +2041,7 @@ int main(int argc, char *argv[])
 	/////////////////
 	// Show Host IP
 	/////////////////
+	if(make_iso == VISO_NONE)
 #ifdef WIN32
 	{
 		char host[256];
@@ -1929,7 +2086,22 @@ int main(int argc, char *argv[])
 		freeifaddrs(addrs);
 	}
 #endif
+	
+#endif // #ifndef MAKEISO
 
+	if(make_iso)
+	{
+		char outfile[MAX_PATH_LEN];
+		sprintf(outfile, "%s.iso", strrchr(root_directory, '/') + 1);
+
+		char *pos1 = strstr(outfile, ".iso."); if(pos1) sprintf(pos1, ".new.iso");
+		char *pos2 = strstr(outfile, ".ISO."); if(pos2) sprintf(pos2, ".new.iso");
+
+		create_iso(root_directory, outfile, make_iso);
+		goto exit_error;
+	}
+
+#ifndef MAKEISO
 	//////////////
 	// main loop
 	//////////////
@@ -2034,7 +2206,8 @@ int main(int argc, char *argv[])
 #endif
 
 	return SUCCEEDED;
-
+#endif //#ifndef MAKEISO
+	
 exit_error:
 	printf("\n\nPress ENTER to continue...");
 	getchar();

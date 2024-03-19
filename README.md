@@ -1,5 +1,46 @@
 # ps3netsrv
 
+ps3netsrv is a server application used to stream content from a remote server to the PS3.
+
+Supports automatic decryption of encrypted PS3 ISO and folder conversion to PS3 ISO or standard ISO.
+
+For more information: https://github.com/aldostools/webMAN-MOD/wiki/~-PS3-NET-Server
+
+Command line syntax:
+```
+ps3netsrv  [rootdirectory] [port] [whitelist]
+
+ Default port: 38008
+
+ Whitelist: x.x.x.x, where x is 0-255 or *
+ (e.g 192.168.1.* to allow only connections from 192.168.1.0-192.168.1.255)
+```
+
+ISO conversion / decryption command line syntax:
+```
+ps3netsrv  [game directory / encrypted iso] [PS3/ISO]
+```
+
+## Features
+
+* Support up to 5 PS3 clients concurrently
+* Configurable shared root directory (uses ps3netsrv path if the root directory is omitted)
+* Configurable port (38008 is used by default if port is omitted)
+* Start without command line parameters if GAMES, PS3ISO, PSXISO folders are found in ps3netsrv folder
+* List local server IP addresses
+* Remote IP address filtering: Whitelist IP addresses using wildcards
+* Remote file operations (stat, open, create, read, close, delete, mkdir, rmdir)
+* Remote directory listing (whole directory at once or by file) / include subdirectories
+* List files in specified directory and all subdirectories if the path ends with //
+* Merge multiple paths into a single directory (list paths in folder_name.INI)
+* Streaming of ISO images (CD-ROM, CD-ROM XA, DVD, Bluray or PS3 Blurays)
+* Detection of standard & non-standard CD sector sizes: 2048, 2352, 2336, 2448, 2328, 2368, 2340
+* Multi-part ISO support (ISO images split as *.iso.0, *.iso.1, etc.)
+* Realtime decryption of PS3 ISO images (3k3y & redump encrypted images)
+* Realtime conversion of mounted folder to virtual ISO (vISO)
+* Convert game folder or directory to local ISO file (drag & drop the ISO or folder for easy conversion)
+* Decrypt encrypted PS3 ISO (using redump/3k3y encryption) into a new decrypted ISO
+
 ## Requirements
 
 * A C/C++ compiler
@@ -66,6 +107,9 @@ OpenWrt<br>
 All platforms (arm, arc, mips, mipsel, i386, powerpc, x86): https://github.com/jhonathanc/ps3netsrv/releases<br> 
 SRC: https://github.com/jhonathanc/ps3netsrv-openwrt<br>
 
+QNAP NAS<br>
+https://www.myqnap.org/product/ps3netsrv-ng/ <br>
+
 Xcode (macOS / Linux / FreeBSD 10):<br>
 https://github.com/klahjn/ps3netsrvXCODE <br>
 https://github.com/klahjn/macOSPS3NetServerGUI
@@ -74,7 +118,8 @@ Google Go: https://github.com/xakep666/ps3netsrv-go
 
 ps3netsrv modified for encrypted (3k3y/redump) isos: http://forum.redump.org/topic/14472
 
-ps3netsrv modified for multiMAN: http://deanbg.com/ps3netsrv.zip
+ps3netsrv modified for multiMAN:
+https://github.com/aldostools/webMAN-MOD/blob/master/_Projects_/ps3netsrv/bins/old/ps3netsrv-src-deank.7z
 
 Original ps3netsrv by Cobra for Linux / Windows:<br>
 https://github.com/Joonie86/Cobra-7.00/tree/master/446/PC/ps3netsrv

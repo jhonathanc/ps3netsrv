@@ -3,6 +3,10 @@
 
 #include <sys/types.h>
 
+#if defined(__APPLE__)
+#define off64_t off_t
+#endif
+
 #include "AbstractFile.h"
 #include "File.h"
 #include "compat.h"
