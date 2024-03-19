@@ -8,6 +8,8 @@
 #include "common.h"
 #include "compat.h"
 
+extern int make_iso;
+
 static const int FAILED		= -1;
 static const int SUCCEEDED	=  0;
 
@@ -62,7 +64,7 @@ File::~File()
 
 int File::open(const char *path, int flags)
 {
-	init_region_info();
+	if(flags == O_RDONLY) init_region_info();
 
 	if(!path)
 	{
@@ -98,7 +100,7 @@ int File::open(const char *path, int flags)
 		path_ps3iso_loc = strstr((char *)path, (char *)"ps3iso");
 
 	char *path_ext_loc = NULL;
-	if (path_ps3iso_loc)
+	if (path_ps3iso_loc || make_iso)
 	{
 		path_ext_loc = strstr((char *)(path + flen), (char *)".iso");
 		if (path_ext_loc == NULL)
@@ -106,7 +108,9 @@ int File::open(const char *path, int flags)
 	}
 
 	// Encryption only makes sense for .iso or .ISO files in the .../PS3ISO/ folder so exit quick if req is is not related.
-	if (is_multipart || (path_ps3iso_loc == NULL) || (path_ext_loc == NULL) || (path_ext_loc < path_ps3iso_loc))
+	if(make_iso && (flags == O_RDONLY))
+		;
+	else if (is_multipart || (path_ps3iso_loc == NULL) || (path_ext_loc == NULL) || (path_ext_loc < path_ps3iso_loc))
 	{
 		// Clean-up old region_info_ (even-though it shouldn't be needed).
 		if (region_info_ != NULL)
@@ -161,10 +165,22 @@ int File::open(const char *path, int flags)
 	key_path[path_ext_loc - path + 4] = 'y';
 	key_path[path_ext_loc - path + 5] = '\0';
 
-	key_fd = open_file(key_path, flags);
-	if (!FD_OK(key_fd))
+	key_fd = open_file(key_path, O_RDONLY);
+
+	if (!FD_OK(key_fd) && (path_ext_loc > path))
 	{
-		// Check for redump encrypted mode by looking for the ".dkey" file in the "REDKEY" folder.
+		// Check for redump encrypted mode by looking for the ".key" is the same path of the ".iso".
+		key_path[path_ext_loc - path + 1] = 'k';
+		key_path[path_ext_loc - path + 2] = 'e';
+		key_path[path_ext_loc - path + 3] = 'y';
+		key_path[path_ext_loc - path + 4] = '\0';
+
+		key_fd = open_file(key_path, O_RDONLY);
+	}
+	
+	if (!FD_OK(key_fd) && (path_ps3iso_loc > path))
+	{
+		// Check for redump encrypted mode by looking for the ".key" or ".dkey" file in the "REDKEY" folder.
 		key_path[path_ps3iso_loc - path + 0] = 'R';
 		key_path[path_ps3iso_loc - path + 1] = 'E';
 		key_path[path_ps3iso_loc - path + 2] = 'D';
@@ -172,8 +188,23 @@ int File::open(const char *path, int flags)
 		key_path[path_ps3iso_loc - path + 4] = 'E';
 		key_path[path_ps3iso_loc - path + 5] = 'Y';
 
-		key_fd = open_file(key_path, flags);
+		key_fd = open_file(key_path, O_RDONLY);
+
+		if (!FD_OK(key_fd))
+		{
+			// Check for redump encrypted mode by looking for the ".dkey" is the same path of the ".iso".
+			key_path[path_ext_loc - path + 1] = 'd';
+			key_path[path_ext_loc - path + 2] = 'k';
+			key_path[path_ext_loc - path + 3] = 'e';
+			key_path[path_ext_loc - path + 4] = 'y';
+			key_path[path_ext_loc - path + 5] = '\0';
+
+			key_fd = open_file(key_path, O_RDONLY);
+		}
 	}
+
+	if (FD_OK(key_fd))
+		printf("key: %s\n", key_path);
 
 	delete[] key_path;
 
@@ -181,10 +212,14 @@ int File::open(const char *path, int flags)
 	if (FD_OK(key_fd))
 	{
 		char keystr[32];
-		if (read_file(key_fd, keystr, sizeof(keystr)) == sizeof(keystr))
+		unsigned char key[16];
+		int klen = read_file(key_fd, keystr, sizeof(keystr));
+		if (klen == sizeof(keystr) || klen == sizeof(key))
 		{
-			unsigned char key[16];
-			keystr_to_keyarr(keystr, key);
+			if(klen == sizeof(key))
+				memcpy(key, keystr, sizeof(key));
+			else
+				keystr_to_keyarr(keystr, key);
 #ifdef POLARSSL
 			if (aes_setkey_dec(&aes_dec_, key, 128) == SUCCEEDED)
 				enc_type_ = kDiscTypeRedump; // SET ENCRYPTION TYPE: Redump
@@ -270,8 +305,15 @@ int File::open(const char *path, int flags)
 		}
 	}
 
+	if(enc_type_ == kDiscTypeRedump)
+		printf("Redump key found.\n");
+	else if(enc_type_ == kDiscType3k3yEnc)
+		printf("3K3YEnc key found.\n");
+	else if(enc_type_ == kDiscType3k3yDec)
+		printf("3K3YDec key found.\n");
+
 	return SUCCEEDED;
-#endif
+#endif //#ifndef NOSSL
 }
 
 int File::close(void)
@@ -383,7 +425,7 @@ ssize_t File::read(void *buf, size_t nbyte)
 			(unsigned long long int)((region_count_ > 0) ? region_info_[region_count_ - 1].regions_first_addr : 0),
 			(unsigned long long int)((region_count_ > 0) ? region_info_[region_count_ - 1].regions_last_addr  : 0));
 		return ret;
-#endif
+#endif //#ifdef NOSSL
 	}
 
 	// read multi part iso (2015 AV)
@@ -519,5 +561,5 @@ void File::decrypt_data(mbedtls_aes_context &aes, unsigned char *data, int secto
 		}
 	}
 }
-#endif
-#endif
+#endif //#ifdef POLARSSL
+#endif //#ifndef NOSSL

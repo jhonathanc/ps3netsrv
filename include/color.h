@@ -48,6 +48,7 @@ static void set_red_text(void)
 #endif
 }
 
+#ifndef MAKEISO
 static void set_gray_text(void)
 {
 #ifdef WIN32
@@ -56,5 +57,6 @@ static void set_gray_text(void)
 	printf("\033[1;30m");
 #endif
 }
+#endif
 
 #endif
