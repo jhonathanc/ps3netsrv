@@ -1794,9 +1794,9 @@ int main(int argc, char *argv[])
 	// Show build number
 	set_white_text();
 #ifndef MAKEISO
-	printf("ps3netsrv build 20240210a");
+	printf("ps3netsrv build 20240707");
 #else
-	printf("makeiso build 20240210a");
+	printf("makeiso build 20240707");
 #endif
 
 	set_red_text();
@@ -1903,6 +1903,10 @@ int main(int argc, char *argv[])
 			make_iso =  VISO_ISO;
 #endif
 	}
+#ifdef MAKEISO
+	else if(argc >= 3)
+		make_iso =  VISO_ISO;
+#endif
 
 #ifndef MAKEISO
 	// Use current path as default
@@ -2086,11 +2090,15 @@ int main(int argc, char *argv[])
 		freeifaddrs(addrs);
 	}
 #endif
-	
-#endif // #ifndef MAKEISO
 
 	if(make_iso)
 	{
+		if(strlen(root_directory) >= MAX_PATH_LEN - 10)
+		{
+			printf("Path too long: %s\n", root_directory);
+			goto exit_error;
+		}
+
 		char outfile[MAX_PATH_LEN];
 		sprintf(outfile, "%s.iso", strrchr(root_directory, '/') + 1);
 
@@ -2100,6 +2108,48 @@ int main(int argc, char *argv[])
 		create_iso(root_directory, outfile, make_iso);
 		goto exit_error;
 	}
+
+#else // if defined(MAKEISO)
+
+	if(make_iso)
+	{
+		for(int i = 1; i < argc; i++)
+		{
+			file_stat_t st;
+			if(stat_file(argv[i], &st) < 0 || st.mode & S_IFDIR != S_IFDIR)
+			{
+				printf("Invalid path: %s\n", argv[i]);
+				continue;
+			}
+			
+			if(strlen(argv[i]) >= MAX_PATH_LEN - 10)
+			{
+				printf("Path too long: %s\n", argv[i]);
+				goto exit_error;
+			}
+
+			strcpy(root_directory, argv[i]);
+			normalize_path(root_directory, true);
+
+			char outfile[MAX_PATH_LEN];
+			sprintf(outfile, "%s.iso", strrchr(root_directory, '/') + 1);
+
+			char *pos1 = strstr(outfile, ".iso."); if(pos1) sprintf(pos1, ".new.iso");
+			char *pos2 = strstr(outfile, ".ISO."); if(pos2) sprintf(pos2, ".new.iso");
+
+			char sfo_path[sizeof(root_directory) + 20];
+			snprintf(sfo_path, sizeof(sfo_path) - 1, "%s/PS3_GAME/PARAM.SFO", root_directory);
+
+			if(stat_file(sfo_path, &st) >= 0)
+				make_iso =  VISO_PS3;
+			else
+				make_iso =  VISO_ISO;
+
+			create_iso(root_directory, outfile, make_iso);
+		}
+		goto exit_error;
+	}
+#endif // #ifndef MAKEISO
 
 #ifndef MAKEISO
 	//////////////
