@@ -17,6 +17,10 @@ CPPFLAGS += -Wall -Wno-format -I./include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_B
 #CFLAGS += -DMAKEISO
 #CPPFLAGS += -DMAKEISO
 
+#CFLAGS += -DNO_UPDATE
+#CPPFLAGS += -DNO_UPDATE
+#OUTPUT := makeiso_rip
+
 #CFLAGS += -DNOSSL
 #CPPFLAGS +=-DNOSSL
 #OBJS = src/main.o src/compat.o src/mem.o src/File.o src/VIsoFile.o

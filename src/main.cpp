@@ -318,8 +318,13 @@ static int create_iso(char *folder_path, char *fileout, int viso)
 				const uint32_t buf_size = 0x10000;
 				char *buffer = (char *)client.buf;
 				uint64_t offset = 0;
-				uint64_t rem_size = st.file_size % buf_size;
-				uint64_t iso_size = st.file_size - rem_size;
+				uint64_t file_size = st.file_size;
+				#ifdef NO_UPDATE
+				if(client.ro_file->ps3Mode && (viso == VISO_NONE) && (file_size > 268435456))
+					file_size -= 268435456; // truncate last 256 MB (PS3UPDAT.PUP) from encrypted ISO
+				#endif
+				uint64_t rem_size = file_size % buf_size;
+				uint64_t iso_size = file_size - rem_size;
 				uint16_t count = 0x100;
 				if(iso_size >= buf_size)
 				{
@@ -336,7 +341,7 @@ static int create_iso(char *folder_path, char *fileout, int viso)
 					client.ro_file->read(buffer, rem_size);
 					write_file(fd_out, buffer, rem_size);
 				}
-				printf("Dumped ISO: %llu bytes\n", (long long unsigned int)st.file_size);
+				printf("Dumped ISO: %llu bytes\n", (long long unsigned int)file_size);
 			}
 
 			close_file(fd_out);
@@ -1794,9 +1799,9 @@ int main(int argc, char *argv[])
 	// Show build number
 	set_white_text();
 #ifndef MAKEISO
-	printf("ps3netsrv build 20240707");
+	printf("ps3netsrv build 20240709");
 #else
-	printf("makeiso build 20240707");
+	printf("makeiso build 20240709");
 #endif
 
 	set_red_text();
@@ -2116,7 +2121,7 @@ int main(int argc, char *argv[])
 		for(int i = 1; i < argc; i++)
 		{
 			file_stat_t st;
-			if(stat_file(argv[i], &st) < 0 || st.mode & S_IFDIR != S_IFDIR)
+			if(stat_file(argv[i], &st) < 0)
 			{
 				printf("Invalid path: %s\n", argv[i]);
 				continue;

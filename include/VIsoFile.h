@@ -64,8 +64,6 @@ class VIsoFile : public AbstractFile
 {
 private:
 
-	bool ps3Mode;
-
 	off64_t vFilePtr;
 
 	uint8_t *fsBuf;
@@ -124,6 +122,7 @@ public:
 	virtual ssize_t write(void *buf, size_t nbyte);
 	virtual int64_t seek(int64_t offset, int whence);
 	virtual int fstat(file_stat_t *fs);
+	bool ps3Mode;
 };
 
 #endif
