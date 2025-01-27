@@ -1375,13 +1375,15 @@ send_result_read_dir:
 	return SUCCEEDED;
 }
 
-static void process_read_dir(netiso_read_dir_result_data *dir_entries, char *path, size_t dirpath_len, size_t path_len, int max_items, int *nitems, int subdirs)
+static void process_read_dir(netiso_read_dir_result_data *dir_entries, const char *dir_path, size_t dirpath_len, size_t path_len, int max_items, int *nitems, int subdirs)
 {
 	int items = *nitems;
 
 	file_stat_t st;
 	struct dirent *entry;
 	size_t d_name_len;
+
+	char path[MAX_PATH_LEN]; strcpy(path, dir_path);
 
 	normalize_path(path, true);
 	DIR *dir2 = opendir(path);
@@ -1799,9 +1801,9 @@ int main(int argc, char *argv[])
 	// Show build number
 	set_white_text();
 #ifndef MAKEISO
-	printf("ps3netsrv build 20240709");
+	printf("ps3netsrv build 20250126");
 #else
-	printf("makeiso build 20240709");
+	printf("makeiso build 20250126");
 #endif
 
 	set_red_text();
