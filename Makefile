@@ -2,7 +2,7 @@ OS = windows
 BUILD_TYPE = release_static
 
 OUTPUT := ps3netsrv
-OBJS = src/main.o src/padlock.o src/aes.o src/compat.o src/mem.o src/File.o src/VIsoFile.o
+OBJS = src/main.o src/padlock.o src/aes.o src/compat.o src/mem.o src/File.o src/VIsoFile2.o
 
 CFLAGS = -Wall -Wno-format -I./include -std=gnu99 -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -DPOLARSSL
 CPPFLAGS += -Wall -Wno-format -I./include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -DPOLARSSL
@@ -23,7 +23,7 @@ CPPFLAGS += -Wall -Wno-format -I./include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_B
 
 #CFLAGS += -DNOSSL
 #CPPFLAGS +=-DNOSSL
-#OBJS = src/main.o src/compat.o src/mem.o src/File.o src/VIsoFile.o
+#OBJS = src/main.o src/compat.o src/mem.o src/File.o src/VIsoFile2.o
 
 LDFLAGS = -L.
 LIBS = -lstdc++
