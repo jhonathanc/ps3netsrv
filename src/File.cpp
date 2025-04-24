@@ -312,6 +312,8 @@ int File::open(const char *path, int flags)
 	else if(enc_type_ == kDiscType3k3yDec)
 		printf("3K3YDec key found.\n");
 
+	ps3Mode = (enc_type_ > kDiscTypeNone);
+
 	return SUCCEEDED;
 #endif //#ifndef NOSSL
 }

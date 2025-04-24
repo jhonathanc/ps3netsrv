@@ -85,6 +85,8 @@ class File : public AbstractFile
 	File();
 	virtual ~File();
 
+	bool ps3Mode;
+
 	virtual int open(const char *path, int flags);
 	virtual int close(void);
 	virtual ssize_t read(void *buf, size_t nbyte);

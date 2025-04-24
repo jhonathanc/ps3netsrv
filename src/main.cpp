@@ -318,8 +318,13 @@ static int create_iso(char *folder_path, char *fileout, int viso)
 				const uint32_t buf_size = 0x10000;
 				char *buffer = (char *)client.buf;
 				uint64_t offset = 0;
-				uint64_t rem_size = st.file_size % buf_size;
-				uint64_t iso_size = st.file_size - rem_size;
+				uint64_t file_size = st.file_size;
+				#ifdef NO_UPDATE
+				if(client.ro_file->ps3Mode && (viso == VISO_NONE) && (file_size > 268435456))
+					file_size -= 268435456; // truncate last 256 MB (PS3UPDAT.PUP) from encrypted ISO
+				#endif
+				uint64_t rem_size = file_size % buf_size;
+				uint64_t iso_size = file_size - rem_size;
 				uint16_t count = 0x100;
 				if(iso_size >= buf_size)
 				{
@@ -336,7 +341,7 @@ static int create_iso(char *folder_path, char *fileout, int viso)
 					client.ro_file->read(buffer, rem_size);
 					write_file(fd_out, buffer, rem_size);
 				}
-				printf("Dumped ISO: %llu bytes\n", (long long unsigned int)st.file_size);
+				printf("Dumped ISO: %llu bytes\n", (long long unsigned int)file_size);
 			}
 
 			close_file(fd_out);
@@ -1370,13 +1375,15 @@ send_result_read_dir:
 	return SUCCEEDED;
 }
 
-static void process_read_dir(netiso_read_dir_result_data *dir_entries, char *path, size_t dirpath_len, size_t path_len, int max_items, int *nitems, int subdirs)
+static void process_read_dir(netiso_read_dir_result_data *dir_entries, const char *dir_path, size_t dirpath_len, size_t path_len, int max_items, int *nitems, int subdirs)
 {
 	int items = *nitems;
 
 	file_stat_t st;
 	struct dirent *entry;
 	size_t d_name_len;
+
+	char path[MAX_PATH_LEN]; strcpy(path, dir_path);
 
 	normalize_path(path, true);
 	DIR *dir2 = opendir(path);
@@ -1794,9 +1801,9 @@ int main(int argc, char *argv[])
 	// Show build number
 	set_white_text();
 #ifndef MAKEISO
-	printf("ps3netsrv build 20240210a");
+	printf("ps3netsrv build 20250216");
 #else
-	printf("makeiso build 20240210a");
+	printf("makeiso build 20250216");
 #endif
 
 	set_red_text();
@@ -1903,6 +1910,10 @@ int main(int argc, char *argv[])
 			make_iso =  VISO_ISO;
 #endif
 	}
+#ifdef MAKEISO
+	else if(argc >= 3)
+		make_iso =  VISO_ISO;
+#endif
 
 #ifndef MAKEISO
 	// Use current path as default
@@ -2086,11 +2097,15 @@ int main(int argc, char *argv[])
 		freeifaddrs(addrs);
 	}
 #endif
-	
-#endif // #ifndef MAKEISO
 
 	if(make_iso)
 	{
+		if(strlen(root_directory) >= MAX_PATH_LEN - 10)
+		{
+			printf("Path too long: %s\n", root_directory);
+			goto exit_error;
+		}
+
 		char outfile[MAX_PATH_LEN];
 		sprintf(outfile, "%s.iso", strrchr(root_directory, '/') + 1);
 
@@ -2100,6 +2115,48 @@ int main(int argc, char *argv[])
 		create_iso(root_directory, outfile, make_iso);
 		goto exit_error;
 	}
+
+#else // if defined(MAKEISO)
+
+	if(make_iso)
+	{
+		for(int i = 1; i < argc; i++)
+		{
+			file_stat_t st;
+			if(stat_file(argv[i], &st) < 0)
+			{
+				printf("Invalid path: %s\n", argv[i]);
+				continue;
+			}
+			
+			if(strlen(argv[i]) >= MAX_PATH_LEN - 10)
+			{
+				printf("Path too long: %s\n", argv[i]);
+				goto exit_error;
+			}
+
+			strcpy(root_directory, argv[i]);
+			normalize_path(root_directory, true);
+
+			char outfile[MAX_PATH_LEN];
+			sprintf(outfile, "%s.iso", strrchr(root_directory, '/') + 1);
+
+			char *pos1 = strstr(outfile, ".iso."); if(pos1) sprintf(pos1, ".new.iso");
+			char *pos2 = strstr(outfile, ".ISO."); if(pos2) sprintf(pos2, ".new.iso");
+
+			char sfo_path[sizeof(root_directory) + 20];
+			snprintf(sfo_path, sizeof(sfo_path) - 1, "%s/PS3_GAME/PARAM.SFO", root_directory);
+
+			if(stat_file(sfo_path, &st) >= 0)
+				make_iso =  VISO_PS3;
+			else
+				make_iso =  VISO_ISO;
+
+			create_iso(root_directory, outfile, make_iso);
+		}
+		goto exit_error;
+	}
+#endif // #ifndef MAKEISO
 
 #ifndef MAKEISO
 	//////////////

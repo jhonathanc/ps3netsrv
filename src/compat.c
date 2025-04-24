@@ -1,3 +1,4 @@
+#include <string.h>
 #include "compat.h"
 #include "mem.h"
 
@@ -306,6 +307,10 @@ int stat_file(const char *path, file_stat_t *fs)
 
 	fs->file_size = ((uint64_t)wfd.nFileSizeHigh << 32) | wfd.nFileSizeLow;
 
+	#ifdef NO_UPDATE
+	if(strstr(path, "/PS3UPDAT.PUP")) fs->file_size = 0;
+	#endif
+
 	fs->ctime = FileTimeToUnixTime(&wfd.ftCreationTime, NULL);
 	fs->atime = FileTimeToUnixTime(&wfd.ftLastAccessTime, NULL);
 	fs->mtime = FileTimeToUnixTime(&wfd.ftLastWriteTime, NULL);
@@ -403,6 +408,11 @@ int stat_file(const char *path, file_stat_t *fs)
 		return ret;
 
 	fs->file_size = st.st_size;
+
+	#ifdef NO_UPDATE
+	if(strstr(path, "/PS3UPDAT.PUP")) fs->file_size = 0;
+	#endif
+
 	fs->mtime = st.st_mtime;
 	fs->ctime = st.st_ctime;
 	fs->atime = st.st_atime;

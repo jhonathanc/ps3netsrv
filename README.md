@@ -107,6 +107,9 @@ OpenWrt<br>
 All platforms (arm, arc, mips, mipsel, i386, powerpc, x86): https://github.com/jhonathanc/ps3netsrv/releases<br> 
 SRC: https://github.com/jhonathanc/ps3netsrv-openwrt<br>
 
+Synology (maintained by @Hirador)
+https://synocommunity.com/package/ps3netsrv <br>
+
 QNAP NAS<br>
 https://www.myqnap.org/product/ps3netsrv-ng/ <br>
 
