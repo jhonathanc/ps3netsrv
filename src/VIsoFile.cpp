@@ -611,7 +611,7 @@ Iso9660DirectoryRecord *VIsoFile::findDirRecord(const char *dirName, Iso9660Dire
 
 	if (!joliet)
 	{
-		strCheckSize = strncpy_upper((char *)strCheck, dirName, MAX_ISONAME - 2);
+		strCheckSize = strncpy_upper((char *)strCheck, dirName, MAX_ISONAME - 3);
 	}
 	else
 	{
@@ -863,7 +863,7 @@ bool VIsoFile::buildContent(DirList *dirList, bool joliet)
 
 			if (!joliet)
 			{
-				record->len_fi = strncpy_upper(&record->fi, fileName, MAX_ISONAME - 2);
+				record->len_fi = strncpy_upper(&record->fi, fileName, MAX_ISONAME - 3);
 				strcat(&record->fi + record->len_fi, ";1");
 				record->len_fi += 2;
 			}
