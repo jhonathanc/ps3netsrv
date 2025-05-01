@@ -1801,9 +1801,9 @@ int main(int argc, char *argv[])
 	// Show build number
 	set_white_text();
 #ifndef MAKEISO
-	printf("ps3netsrv build 20250216");
+	printf("ps3netsrv build 20250501");
 #else
-	printf("makeiso build 20250216");
+	printf("makeiso build 20250501");
 #endif
 
 	set_red_text();
