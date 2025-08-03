@@ -855,6 +855,7 @@ send_result_read_file:
 	return SUCCEEDED;
 }
 
+#ifndef READ_ONLY
 static int process_create_cmd(client_t *client, netiso_create_cmd *cmd)
 {
 	netiso_create_result result;
@@ -1121,6 +1122,7 @@ static int process_rmdir_cmd(client_t *client, netiso_rmdir_cmd *cmd)
 
 	return SUCCEEDED;
 }
+#endif // #ifndef READ_ONLY
 
 static int process_open_dir_cmd(client_t *client, netiso_open_dir_cmd *cmd)
 {
@@ -1203,6 +1205,7 @@ static int process_open_dir_cmd(client_t *client, netiso_open_dir_cmd *cmd)
 	return SUCCEEDED;
 }
 
+#ifndef READ_ONLY
 static int process_read_dir_entry_cmd(client_t *client, netiso_read_dir_entry_cmd *cmd, int version)
 {
 	(void) cmd;
@@ -1374,6 +1377,7 @@ send_result_read_dir:
 
 	return SUCCEEDED;
 }
+#endif // #ifndef READ_ONLY
 
 static void process_read_dir(netiso_read_dir_result_data *dir_entries, const char *dir_path, size_t dirpath_len, size_t path_len, int max_items, int *nitems, int subdirs)
 {
@@ -1723,6 +1727,7 @@ void *client_thread(void *arg)
 				ret = process_read_cd_2048_critical_cmd(client, (netiso_read_cd_2048_critical_cmd *)&cmd);
 			break;
 
+#ifndef READ_ONLY
 			case NETISO_CMD_WRITE_FILE:
 				ret = process_write_file_cmd(client, (netiso_write_file_cmd *)&cmd);
 			break;
@@ -1734,6 +1739,7 @@ void *client_thread(void *arg)
 			case NETISO_CMD_READ_DIR_ENTRY_V2:
 				ret = process_read_dir_entry_cmd(client, (netiso_read_dir_entry_cmd *)&cmd, 2);
 			break;
+#endif
 
 			case NETISO_CMD_STAT_FILE:
 				ret = process_stat_cmd(client, (netiso_stat_cmd *)&cmd);
@@ -1743,6 +1749,7 @@ void *client_thread(void *arg)
 				ret = process_open_cmd(client, (netiso_open_cmd *)&cmd);
 			break;
 
+#ifndef READ_ONLY
 			case NETISO_CMD_CREATE_FILE:
 				ret = process_create_cmd(client, (netiso_create_cmd *)&cmd);
 			break;
@@ -1750,6 +1757,7 @@ void *client_thread(void *arg)
 			case NETISO_CMD_DELETE_FILE:
 				ret = process_delete_file_cmd(client, (netiso_delete_file_cmd *)&cmd);
 			break;
+#endif
 
 			case NETISO_CMD_OPEN_DIR:
 				ret = process_open_dir_cmd(client, (netiso_open_dir_cmd *)&cmd);
@@ -1763,6 +1771,7 @@ void *client_thread(void *arg)
 				ret = process_get_dir_size_cmd(client, (netiso_get_dir_size_cmd *)&cmd);
 			break;
 
+#ifndef READ_ONLY
 			case NETISO_CMD_MKDIR:
 				ret = process_mkdir_cmd(client, (netiso_mkdir_cmd *)&cmd);
 			break;
@@ -1770,6 +1779,7 @@ void *client_thread(void *arg)
 			case NETISO_CMD_RMDIR:
 				ret = process_rmdir_cmd(client, (netiso_rmdir_cmd *)&cmd);
 			break;
+#endif
 
 			default:
 				printf("ERROR: Unknown command received: %04X\n", BE16(cmd.opcode));
@@ -1801,9 +1811,13 @@ int main(int argc, char *argv[])
 	// Show build number
 	set_white_text();
 #ifndef MAKEISO
-	printf("ps3netsrv build 20250501");
+	printf("ps3netsrv build 20250803");
+	#ifdef READ_ONLY
+	set_gray_text();
+	printf(" [READ-ONLY]");
+	#endif
 #else
-	printf("makeiso build 20250501");
+	printf("makeiso build 20250803");
 #endif
 
 	set_red_text();
