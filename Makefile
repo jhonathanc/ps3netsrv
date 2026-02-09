@@ -47,7 +47,7 @@ OUTPUT := $(OUTPUT).exe
 endif
 
 ifeq ($(OS), cross)
-OBJS += scandir.o dirent.o
+OBJS += src/scandir.o src/dirent.o
 CC = i586-pc-mingw32-gcc
 CXX = i586-pc-mingw32-g++
 LIBS += -lws2_32

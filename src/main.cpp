@@ -2076,7 +2076,7 @@ int main(int argc, char *argv[])
 		{
 			printf("Current Host Name: %s\n", host);
 			host_entry = gethostbyname(host); //find host information
-			if(host_entry);
+			if(host_entry)
 			{
 				set_gray_text();
 				for(int i = 0; host_entry->h_addr_list[i]; i++)
