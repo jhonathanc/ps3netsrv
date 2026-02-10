@@ -139,20 +139,20 @@ jobs:
         
         # Move and rename
         RPM_FILE=$(find rpmbuild/RPMS -name "*.rpm")
-        NEW_NAME="ps3netsrv_${{ matrix.distro }}.rpm"
+        NEW_NAME="ps3netsrv_${{ matrix.distro }}_amd64.rpm"
         mv "$RPM_FILE" "$NEW_NAME"
         echo "PACKAGED_FILE=$NEW_NAME" >> $GITHUB_ENV
 
     - name: Prepare Binary Artifact (Arch/Others)
       if: matrix.package_type == 'binary'
       run: |
-        mv ps3netsrv ps3netsrv_${{ matrix.distro }}_x64
-        echo "PACKAGED_FILE=ps3netsrv_${{ matrix.distro }}_x64" >> $GITHUB_ENV
+        mv ps3netsrv ps3netsrv_${{ matrix.distro }}_amd64
+        echo "PACKAGED_FILE=ps3netsrv_${{ matrix.distro }}_amd64" >> $GITHUB_ENV
 
     - name: Upload Linux Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ps3netsrv_${{ matrix.distro }}_x64
+        name: ps3netsrv_${{ matrix.distro }}_amd64
         path: ${{ env.PACKAGED_FILE }}
 
   build-openwrt:
@@ -338,5 +338,5 @@ jobs:
     - name: Upload OpenWrt Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.upload_name }}
+        name: ${{ matrix.upload_name }}_openwrt
         path: ${{ env.IPK_PATH }}
