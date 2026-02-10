@@ -123,6 +123,7 @@ jobs:
     - name: Prepare Binary Artifact (Arch/Others)
       if: matrix.package_type == 'binary'
       run: |
+        mv ps3netsrv ps3netsrv_${{ matrix.distro }}_x64
         echo "PACKAGED_FILE=ps3netsrv_${{ matrix.distro }}_x64" >> $GITHUB_ENV
 
     - name: Upload Linux Artifact
