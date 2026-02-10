@@ -313,8 +313,20 @@ jobs:
         cp -r $GITHUB_WORKSPACE/include package/ps3netsrv/src_code/
         cp -r $GITHUB_WORKSPACE/src package/ps3netsrv/src_code/
         
-        # Update feeds
-        ./scripts/feeds update -a
+        # Update feeds with retry logic
+        n=0
+        until [ "$n" -ge 5 ]
+        do
+           ./scripts/feeds update -a && break
+           n=$((n+1))
+           echo "Feed update failed. Retrying in 10 seconds..."
+           sleep 10
+        done
+        if [ "$n" -ge 5 ]; then
+            echo "Feed update failed after 5 attempts"
+            exit 1
+        fi
+
         ./scripts/feeds install -a
         
         make defconfig
