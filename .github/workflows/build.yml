@@ -152,14 +152,14 @@ jobs:
     - name: Upload Linux Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ps3netsrv_${{ matrix.distro }}
+        name: ps3netsrv_${{ matrix.distro }}_x64
         path: ${{ env.PACKAGED_FILE }}
 
   build-openwrt:
     name: OpenWrt (${{ matrix.platform }})
     runs-on: ubuntu-22.04
     strategy:
-      max-parallel: 3
+      max-parallel: 6
       fail-fast: false
       matrix:
         platform: [mips_24kc, mipsel_24kc, aarch64_cortex-a53, aarch64_cortex-a72, arm_cortex-a9_vfpv3-d16, mips_4kec, mips_mips32, mipsel_24kc_24kf, mipsel_74kc, mipsel_mips32, mips64_octeonplus, powerpc_464fp, powerpc_8540, aarch64_generic, arm_arm926ej-s, arm_arm1176jzf-s_vfp, arm_cortex-a15_neon-vfpv4, arm_cortex-a5_vfpv4, arm_cortex-a7, arm_cortex-a7_neon-vfpv4, arm_cortex-a8_vfpv3, arm_cortex-a9, arm_cortex-a9_neon, arm_fa526, arm_mpcore, arm_xscale, x86_64, i386_pentium4, i386_pentium-mmx]
