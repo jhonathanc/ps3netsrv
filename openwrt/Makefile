@@ -21,7 +21,7 @@ define Package/ps3netsrv
   CATEGORY:=Network
   SUBMENU:=File Transfer
   TITLE:=PS3 Game Server
-  URL:=https://github.com/jhonathanc/ps3netsrv-openwrt/
+  URL:=https://github.com/aldostools/ps3netsrv/
   DEPENDS:=+libpthread +libstdcpp
 endef
 
