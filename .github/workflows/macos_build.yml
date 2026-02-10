@@ -16,7 +16,7 @@ jobs:
 
     - name: Build and Package for MacOS
       run: |
-        make OS=linux CFLAGS="-O3 -Wall -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -DPOLARSSL -DBUILD_DATE=\\\"$(date +%Y%m%d)\\\" -DNDEBUG -I./include" LIBS="-lstdc++ -lpthread"
+        make OS=linux BUILD_TYPE=release CFLAGS="-O3 -Wall -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -DPOLARSSL -DBUILD_DATE=\\\"$(date +%Y%m%d)\\\" -DNDEBUG -I./include" LIBS="-lstdc++ -lpthread"
         
         # Create staging directory structure
         mkdir -p pkg-root/usr/local/bin
