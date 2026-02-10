@@ -19,7 +19,7 @@ jobs:
 
     - name: Build for Windows 64-bit
       run: |
-        make OS=cross CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++
+        make OS=cross CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ BUILD_DATE=$(date +%Y%m%d)
         mv ps3netsrv.exe ps3netsrv_win64.exe
 
     - name: Upload Windows Artifact
@@ -66,7 +66,7 @@ jobs:
       run: ${{ matrix.install_cmd }}
 
     - name: Build
-      run: make OS=linux
+      run: make OS=linux BUILD_DATE=$(date +%Y%m%d)
 
     - name: Package .deb (Debian/Ubuntu)
       if: matrix.package_type == 'deb'
