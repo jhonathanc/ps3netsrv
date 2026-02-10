@@ -78,7 +78,7 @@ jobs:
         
         # Create control file
         echo "Package: ps3netsrv" > package/DEBIAN/control
-        echo "Version: 1.4" >> package/DEBIAN/control
+        echo "Version: $(date +%Y%m%d)" >> package/DEBIAN/control
         echo "Architecture: amd64" >> package/DEBIAN/control
         echo "Maintainer: Aldo Vargas <aldostools@gmail.com>" >> package/DEBIAN/control
         echo "Description: PS3 Net Server" >> package/DEBIAN/control
@@ -95,7 +95,7 @@ jobs:
         # Create spec file
         cat <<EOF > rpmbuild/SPECS/ps3netsrv.spec
         Name: ps3netsrv
-        Version: 1.4
+        Version: $(date +%Y%m%d)
         Release: 1
         Summary: PS3 Net Server
         License: GPL
