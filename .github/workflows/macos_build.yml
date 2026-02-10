@@ -1,0 +1,32 @@
+name: MacOS Build
+
+on:
+  push:
+    branches: [ "macos_build" ]
+  pull_request:
+    branches: [ "macos_build" ]
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    name: MacOS Build
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build and Package for MacOS
+      run: |
+        make OS=linux BUILD_DATE=$(date +%Y%m%d)
+        
+        # Create staging directory structure
+        mkdir -p pkg-root/usr/local/bin
+        cp ps3netsrv pkg-root/usr/local/bin/
+        
+        # Build the package
+        pkgbuild --root pkg-root --identifier com.aldostools.ps3netsrv --version $(date +%Y%m%d) --install-location / ps3netsrv_macos.pkg
+
+    - name: Upload MacOS Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ps3netsrv_macos
+        path: ps3netsrv_macos.pkg
