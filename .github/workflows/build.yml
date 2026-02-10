@@ -8,8 +8,31 @@ on:
   workflow_dispatch:
 
 jobs:
+  build-macos:
+    name: MacOS Build
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build and Package for MacOS
+      run: |
+        make OS=linux BUILD_TYPE=release CFLAGS="-O3 -Wall -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -DPOLARSSL -DBUILD_DATE=\\\"$(date +%Y%m%d)\\\" -DNDEBUG -I./include" LIBS="-lstdc++ -lpthread"
+        
+        # Create staging directory structure
+        mkdir -p pkg-root/usr/local/bin
+        cp ps3netsrv pkg-root/usr/local/bin/
+        
+        # Build the package
+        pkgbuild --root pkg-root --identifier com.aldostools.ps3netsrv --version $(date +%Y%m%d) --install-location / ps3netsrv_macos.pkg
+
+    - name: Upload MacOS Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ps3netsrv_macos
+        path: ps3netsrv_macos.pkg
+
   build-windows:
-    name: Windows 64-bit
+    name: Windows 64-bit Build
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -29,7 +52,7 @@ jobs:
         path: ps3netsrv_win64.exe
 
   build-linux:
-    name: Linux (${{ matrix.distro }})
+    name: Linux (${{ matrix.distro }}) Build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -136,6 +159,7 @@ jobs:
     name: OpenWrt (${{ matrix.platform }})
     runs-on: ubuntu-22.04
     strategy:
+      max-parallel: 3
       fail-fast: false
       matrix:
         platform: [mips_24kc, mipsel_24kc, aarch64_cortex-a53, aarch64_cortex-a72, arm_cortex-a9_vfpv3-d16, mips_4kec, mips_mips32, mipsel_24kc_24kf, mipsel_74kc, mipsel_mips32, mips64_octeonplus, powerpc_464fp, powerpc_8540, aarch64_generic, arm_arm926ej-s, arm_arm1176jzf-s_vfp, arm_cortex-a15_neon-vfpv4, arm_cortex-a5_vfpv4, arm_cortex-a7, arm_cortex-a7_neon-vfpv4, arm_cortex-a8_vfpv3, arm_cortex-a9, arm_cortex-a9_neon, arm_fa526, arm_mpcore, arm_xscale, x86_64, i386_pentium4, i386_pentium-mmx]
@@ -312,26 +336,3 @@ jobs:
       with:
         name: ${{ matrix.upload_name }}
         path: ${{ env.IPK_PATH }}
-
-  build-macos:
-    name: MacOS Build
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Build and Package for MacOS
-      run: |
-        make OS=linux BUILD_TYPE=release CFLAGS="-O3 -Wall -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -DPOLARSSL -DBUILD_DATE=\\\"$(date +%Y%m%d)\\\" -DNDEBUG -I./include" LIBS="-lstdc++ -lpthread"
-        
-        # Create staging directory structure
-        mkdir -p pkg-root/usr/local/bin
-        cp ps3netsrv pkg-root/usr/local/bin/
-        
-        # Build the package
-        pkgbuild --root pkg-root --identifier com.aldostools.ps3netsrv --version $(date +%Y%m%d) --install-location / ps3netsrv_macos.pkg
-
-    - name: Upload MacOS Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ps3netsrv_macos
-        path: ps3netsrv_macos.pkg
