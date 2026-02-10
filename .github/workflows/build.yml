@@ -38,18 +38,23 @@ jobs:
           - distro: ubuntu-latest
             image: ubuntu:latest
             install_cmd: apt-get update && apt-get install -y build-essential git
+            package_type: deb
           - distro: debian-latest
             image: debian:latest
             install_cmd: apt-get update && apt-get install -y build-essential git
+            package_type: deb
           - distro: fedora-latest
             image: fedora:latest
-            install_cmd: dnf install -y gcc-c++ make git glibc-static libstdc++-static
+            install_cmd: dnf install -y gcc-c++ make git glibc-static libstdc++-static rpm-build
+            package_type: rpm
           - distro: arch-latest
             image: archlinux:latest
             install_cmd: pacman -Syu --noconfirm base-devel git
+            package_type: binary
           - distro: almalinux-latest
             image: almalinux:latest
-            install_cmd: dnf install -y gcc-c++ make git glibc-static libstdc++-static
+            install_cmd: dnf install -y gcc-c++ make git glibc-static libstdc++-static rpm-build
+            package_type: rpm
 
     container:
       image: ${{ matrix.image }}
@@ -61,12 +66,68 @@ jobs:
       run: ${{ matrix.install_cmd }}
 
     - name: Build
+      run: make OS=linux
+
+    - name: Package .deb (Debian/Ubuntu)
+      if: matrix.package_type == 'deb'
       run: |
-        make OS=linux
+        PACKAGE_NAME="ps3netsrv_${{ matrix.distro }}_amd64.deb"
+        mkdir -p package/DEBIAN package/usr/local/bin
+        cp ps3netsrv package/usr/local/bin/
+        chmod 755 package/usr/local/bin/ps3netsrv
+        
+        # Create control file
+        echo "Package: ps3netsrv" > package/DEBIAN/control
+        echo "Version: 1.4" >> package/DEBIAN/control
+        echo "Architecture: amd64" >> package/DEBIAN/control
+        echo "Maintainer: Aldo Vargas <aldostools@gmail.com>" >> package/DEBIAN/control
+        echo "Description: PS3 Net Server" >> package/DEBIAN/control
+        
+        dpkg-deb --build package "$PACKAGE_NAME"
+        echo "PACKAGED_FILE=$PACKAGE_NAME" >> $GITHUB_ENV
+
+    - name: Package .rpm (Fedora/AlmaLinux)
+      if: matrix.package_type == 'rpm'
+      run: |
+        mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+        cp ps3netsrv rpmbuild/SOURCES/
+        
+        # Create spec file
+        cat <<EOF > rpmbuild/SPECS/ps3netsrv.spec
+        Name: ps3netsrv
+        Version: 1.4
+        Release: 1
+        Summary: PS3 Net Server
+        License: GPL
+        Group: Applications/Internet
+        
+        %description
+        PS3 Net Server application.
+        
+        %install
+        mkdir -p %{buildroot}/usr/local/bin
+        install -m 755 %{_sourcedir}/ps3netsrv %{buildroot}/usr/local/bin/ps3netsrv
+        
+        %files
+        /usr/local/bin/ps3netsrv
+        EOF
+        
+        rpmbuild --define "_topdir $(pwd)/rpmbuild" -bb rpmbuild/SPECS/ps3netsrv.spec
+        
+        # Move and rename
+        RPM_FILE=$(find rpmbuild/RPMS -name "*.rpm")
+        NEW_NAME="ps3netsrv_${{ matrix.distro }}.rpm"
+        mv "$RPM_FILE" "$NEW_NAME"
+        echo "PACKAGED_FILE=$NEW_NAME" >> $GITHUB_ENV
+
+    - name: Prepare Binary Artifact (Arch/Others)
+      if: matrix.package_type == 'binary'
+      run: |
         mv ps3netsrv ps3netsrv_${{ matrix.distro }}_x64
+        echo "PACKAGED_FILE=ps3netsrv_${{ matrix.distro }}_x64" >> $GITHUB_ENV
 
     - name: Upload Linux Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ps3netsrv_${{ matrix.distro }}_x64
-        path: ps3netsrv_${{ matrix.distro }}_x64
+        name: ps3netsrv_${{ matrix.distro }}
+        path: ${{ env.PACKAGED_FILE }}
