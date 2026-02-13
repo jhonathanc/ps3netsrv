@@ -338,7 +338,7 @@ jobs:
     - name: Upload OpenWrt Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.upload_name }}_openwrt_22
+        name: ${{ matrix.upload_name }}_openwrt_ipk
         path: ${{ env.IPK_PATH }}
 
   build-openwrt-snapshot:
@@ -349,93 +349,291 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: ath79
-            subtarget: generic
-            platform: mips_24kc
-          - target: ramips
-            subtarget: mt7621
-            platform: mipsel_24kc
-          - target: mvebu
-            subtarget: cortexa53
-            platform: aarch64_cortex-a53
-          - target: mvebu
-            subtarget: cortexa72
-            platform: aarch64_cortex-a72
-          - target: mvebu
-            subtarget: cortexa9
-            platform: arm_cortex-a9_vfpv3-d16
-          - target: realtek
-            subtarget: rtl838x
-            platform: mips_4kec
-          - target: bcm63xx
-            subtarget: generic
-            platform: mips_mips32
-          - target: pistachio
-            subtarget: generic
-            platform: mipsel_24kc_24kf
-          - target: bcm47xx
-            subtarget: mips74k
-            platform: mipsel_74kc
-          - target: bcm47xx
-            subtarget: generic
-            platform: mipsel_mips32
-          - target: octeon
-            subtarget: generic
-            platform: mips64_octeonplus
           - target: apm821xx
             subtarget: nand
-            platform: powerpc_464fp
-          - target: mpc85xx
-            subtarget: p1010
-            platform: powerpc_8540
-          - target: layerscape
-            subtarget: armv8_64b
-            platform: aarch64_generic
+            platform: apm821xx_nand
+          - target: apm821xx
+            subtarget: sata
+            platform: apm821xx_sata
+          - target: armsr
+            subtarget: armv7
+            platform: armsr_armv7
+          - target: armsr
+            subtarget: armv8
+            platform: armsr_armv8
           - target: at91
             subtarget: sam9x
-            platform: arm_arm926ej-s
-          - target: bcm27xx
-            subtarget: bcm2708
-            platform: arm_arm1176jzf-s_vfp
-          - target: armvirt
-            subtarget: 32
-            platform: arm_cortex-a15_neon-vfpv4
+            platform: at91_sam9x
           - target: at91
             subtarget: sama5
-            platform: arm_cortex-a5_vfpv4
-          - target: mediatek
-            subtarget: mt7629
-            platform: arm_cortex-a7
+            platform: at91_sama5
+          - target: ath79
+            subtarget: generic
+            platform: ath79_generic
+          - target: ath79
+            subtarget: mikrotik
+            platform: ath79_mikrotik
+          - target: ath79
+            subtarget: nand
+            platform: ath79_nand
+          - target: bcm27xx
+            subtarget: bcm2708
+            platform: bcm27xx_bcm2708
           - target: bcm27xx
             subtarget: bcm2709
-            platform: arm_cortex-a7_neon-vfpv4
-          - target: omap
+            platform: bcm27xx_bcm2709
+          - target: bcm27xx
+            subtarget: bcm2710
+            platform: bcm27xx_bcm2710
+          - target: bcm27xx
+            subtarget: bcm2711
+            platform: bcm27xx_bcm2711
+          - target: bcm27xx
+            subtarget: bcm2712
+            platform: bcm27xx_bcm2712
+          - target: bcm47xx
             subtarget: generic
-            platform: arm_cortex-a8_vfpv3
+            platform: bcm47xx_generic
+          - target: bcm47xx
+            subtarget: legacy
+            platform: bcm47xx_legacy
+          - target: bcm47xx
+            subtarget: mips74k
+            platform: bcm47xx_mips74k
+          - target: bcm4908
+            subtarget: generic
+            platform: bcm4908_generic
           - target: bcm53xx
             subtarget: generic
-            platform: arm_cortex-a9
-          - target: imx
-            subtarget: cortexa9
-            platform: arm_cortex-a9_neon
+            platform: bcm53xx_generic
+          - target: bmips
+            subtarget: bcm6318
+            platform: bmips_bcm6318
+          - target: bmips
+            subtarget: bcm63268
+            platform: bmips_bcm63268
+          - target: bmips
+            subtarget: bcm6328
+            platform: bmips_bcm6328
+          - target: bmips
+            subtarget: bcm6358
+            platform: bmips_bcm6358
+          - target: bmips
+            subtarget: bcm6362
+            platform: bmips_bcm6362
+          - target: bmips
+            subtarget: bcm6368
+            platform: bmips_bcm6368
+          - target: d1
+            subtarget: generic
+            platform: d1_generic
           - target: gemini
             subtarget: generic
-            platform: arm_fa526
-          - target: oxnas
-            subtarget: ox820
-            platform: arm_mpcore
+            platform: gemini_generic
+          - target: imx
+            subtarget: cortexa53
+            platform: imx_cortexa53
+          - target: imx
+            subtarget: cortexa7
+            platform: imx_cortexa7
+          - target: imx
+            subtarget: cortexa9
+            platform: imx_cortexa9
+          - target: ipq40xx
+            subtarget: chromium
+            platform: ipq40xx_chromium
+          - target: ipq40xx
+            subtarget: generic
+            platform: ipq40xx_generic
+          - target: ipq40xx
+            subtarget: mikrotik
+            platform: ipq40xx_mikrotik
+          - target: ipq806x
+            subtarget: chromium
+            platform: ipq806x_chromium
+          - target: ipq806x
+            subtarget: generic
+            platform: ipq806x_generic
+          - target: ixp4xx
+            subtarget: generic
+            platform: ixp4xx_generic
           - target: kirkwood
             subtarget: generic
-            platform: arm_xscale
+            platform: kirkwood_generic
+          - target: lantiq
+            subtarget: ase
+            platform: lantiq_ase
+          - target: lantiq
+            subtarget: xrx200
+            platform: lantiq_xrx200
+          - target: lantiq
+            subtarget: xrx200_legacy
+            platform: lantiq_xrx200_legacy
+          - target: lantiq
+            subtarget: xway
+            platform: lantiq_xway
+          - target: lantiq
+            subtarget: xway_legacy
+            platform: lantiq_xway_legacy
+          - target: layerscape
+            subtarget: armv7
+            platform: layerscape_armv7
+          - target: layerscape
+            subtarget: armv8_64b
+            platform: layerscape_armv8_64b
+          - target: loongarch64
+            subtarget: generic
+            platform: loongarch64_generic
+          - target: malta
+            subtarget: be
+            platform: malta_be
+          - target: malta
+            subtarget: be64
+            platform: malta_be64
+          - target: malta
+            subtarget: le
+            platform: malta_le
+          - target: malta
+            subtarget: le64
+            platform: malta_le64
+          - target: mediatek
+            subtarget: filogic
+            platform: mediatek_filogic
+          - target: mediatek
+            subtarget: mt7622
+            platform: mediatek_mt7622
+          - target: mediatek
+            subtarget: mt7623
+            platform: mediatek_mt7623
+          - target: mediatek
+            subtarget: mt7629
+            platform: mediatek_mt7629
+          - target: microchipsw
+            subtarget: lan969x
+            platform: microchipsw_lan969x
+          - target: mpc85xx
+            subtarget: p1010
+            platform: mpc85xx_p1010
+          - target: mpc85xx
+            subtarget: p1020
+            platform: mpc85xx_p1020
+          - target: mpc85xx
+            subtarget: p2020
+            platform: mpc85xx_p2020
+          - target: mvebu
+            subtarget: cortexa53
+            platform: mvebu_cortexa53
+          - target: mvebu
+            subtarget: cortexa72
+            platform: mvebu_cortexa72
+          - target: mvebu
+            subtarget: cortexa9
+            platform: mvebu_cortexa9
+          - target: mxs
+            subtarget: generic
+            platform: mxs_generic
+          - target: octeon
+            subtarget: generic
+            platform: octeon_generic
+          - target: omap
+            subtarget: generic
+            platform: omap_generic
+          - target: pistachio
+            subtarget: generic
+            platform: pistachio_generic
+          - target: qoriq
+            subtarget: generic
+            platform: qoriq_generic
+          - target: qualcommax
+            subtarget: ipq50xx
+            platform: qualcommax_ipq50xx
+          - target: qualcommax
+            subtarget: ipq60xx
+            platform: qualcommax_ipq60xx
+          - target: qualcommax
+            subtarget: ipq807x
+            platform: qualcommax_ipq807x
+          - target: ramips
+            subtarget: mt7620
+            platform: ramips_mt7620
+          - target: ramips
+            subtarget: mt7621
+            platform: ramips_mt7621
+          - target: ramips
+            subtarget: mt76x8
+            platform: ramips_mt76x8
+          - target: ramips
+            subtarget: rt288x
+            platform: ramips_rt288x
+          - target: ramips
+            subtarget: rt305x
+            platform: ramips_rt305x
+          - target: ramips
+            subtarget: rt3883
+            platform: ramips_rt3883
+          - target: realtek
+            subtarget: rtl838x
+            platform: realtek_rtl838x
+          - target: realtek
+            subtarget: rtl839x
+            platform: realtek_rtl839x
+          - target: realtek
+            subtarget: rtl930x
+            platform: realtek_rtl930x
+          - target: realtek
+            subtarget: rtl930x_nand
+            platform: realtek_rtl930x_nand
+          - target: realtek
+            subtarget: rtl931x
+            platform: realtek_rtl931x
+          - target: realtek
+            subtarget: rtl931x_nand
+            platform: realtek_rtl931x_nand
+          - target: rockchip
+            subtarget: armv8
+            platform: rockchip_armv8
+          - target: sifiveu
+            subtarget: generic
+            platform: sifiveu_generic
+          - target: siflower
+            subtarget: sf21
+            platform: siflower_sf21
+          - target: starfive
+            subtarget: generic
+            platform: starfive_generic
+          - target: stm32
+            subtarget: stm32mp1
+            platform: stm32_stm32mp1
+          - target: sunxi
+            subtarget: arm926ejs
+            platform: sunxi_arm926ejs
+          - target: sunxi
+            subtarget: cortexa53
+            platform: sunxi_cortexa53
+          - target: sunxi
+            subtarget: cortexa7
+            platform: sunxi_cortexa7
+          - target: sunxi
+            subtarget: cortexa8
+            platform: sunxi_cortexa8
+          - target: tegra
+            subtarget: generic
+            platform: tegra_generic
           - target: x86
             subtarget: 64
             platform: x86_64
           - target: x86
             subtarget: generic
-            platform: i386_pentium4
+            platform: x86_generic
           - target: x86
             subtarget: geode
-            platform: i386_pentium-mmx
+            platform: x86_geode
+          - target: x86
+            subtarget: legacy
+            platform: x86_legacy
+          - target: zynq
+            subtarget: generic
+            platform: zynq_generic
 
     steps:
     - uses: actions/checkout@v4
@@ -521,5 +719,5 @@ jobs:
     - name: Upload OpenWrt Snapshot Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ps3netsrv_${{ matrix.platform }}_openwrt_snapshot
+        name: ps3netsrv_${{ matrix.platform }}_openwrt_snapshot_apk
         path: ${{ env.APK_PATH }}
