@@ -394,18 +394,12 @@ jobs:
           - target: realtek
             subtarget: rtl931x
             platform: realtek_rtl931x
-          - target: rockchip
-            subtarget: armv8
-            platform: rockchip_armv8
           - target: sifiveu
             subtarget: generic
             platform: sifiveu_generic
           - target: starfive
             subtarget: generic
             platform: starfive_generic
-          - target: stm32
-            subtarget: stm32mp1
-            platform: stm32_stm32mp1
           - target: sunxi
             subtarget: cortexa53
             platform: sunxi_cortexa53
@@ -771,9 +765,6 @@ jobs:
           - target: realtek
             subtarget: rtl931x_nand
             platform: realtek_rtl931x_nand
-          - target: rockchip
-            subtarget: armv8
-            platform: rockchip_armv8
           - target: sifiveu
             subtarget: generic
             platform: sifiveu_generic
@@ -783,9 +774,6 @@ jobs:
           - target: starfive
             subtarget: generic
             platform: starfive_generic
-          - target: stm32
-            subtarget: stm32mp1
-            platform: stm32_stm32mp1
           - target: sunxi
             subtarget: arm926ejs
             platform: sunxi_arm926ejs
