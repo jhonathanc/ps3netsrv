@@ -326,7 +326,10 @@ jobs:
     - name: Prepare Artifact
       run: |
         IPK_FILE=$(find sdk/bin/packages -name "ps3netsrv*.ipk" | head -n 1)
-        echo "IPK_PATH=$IPK_FILE" >> $GITHUB_ENV
+        # Rename to match artifact name
+        NEW_NAME="ps3netsrv_${{ matrix.platform }}_openwrt_24.ipk"
+        cp "$IPK_FILE" "$NEW_NAME"
+        echo "IPK_PATH=$NEW_NAME" >> $GITHUB_ENV
     
     - name: Upload Binary Artifact
       uses: actions/upload-artifact@v4
