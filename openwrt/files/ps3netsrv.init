@@ -14,27 +14,13 @@ _err() {
 	logger -p daemon.err -t "$NAME" "$*"
 }
 
-_change_owner() {
-	local u="$1"; shift
-
-	local d
-	for d in "$@"; do
-		if [ -f "$d" ]; then
-			chown "$u" "$d" 2>/dev/null || return 1
-		elif [ -d "$d" ]; then
-			chown -R "$u" "$d" 2>/dev/null || return 1
-		fi
-	done
-
-	return 0
-}
-
 ps3netsrv_validate() {
 	uci_validate_section "$NAME" ps3netsrv "$1" \
 		'enabled:bool:0' \
 		'dir:string:/root' \
 		'user:string' \
-		'port:range(1024,65535)'
+		'port:range(1024,65535):38008' \
+		'whitelist:string'
 }
 
 ps3netsrv_start() {
@@ -47,19 +33,19 @@ ps3netsrv_start() {
 	[ -d "$dir" ] || { _err "Please create PS3 Game dir first."; return 1; }
 
 	if [ -n "$user" ]; then
-		if ( user_exists "$user" && _change_owner "$user" "$log" ); then
+		if id -u "$user" >/dev/null 2>&1; then
 				_info "ps3netsrv will run as user '${user}'."
 				if [ "$user" != "root" ]; then
 					_info "Please make sure user '${user}' has read access to directory: ${dir}"
 				fi
 		else
-			_info "Set run user to '${user}' failed, default user will be used."
+			_info "User '${user}' does not exist, default user (root) will be used."
 			user=
 		fi
 	fi
 
 	procd_open_instance "${NAME}.${section}"
-	procd_set_param command "$PROG" "$dir" "$port"
+	procd_set_param command "$PROG" "$dir" "$port" ${whitelist:+"$whitelist"}
 
 	procd_set_param respawn
 	procd_set_param stdout 1
