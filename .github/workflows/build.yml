@@ -155,8 +155,8 @@ jobs:
         name: ps3netsrv_${{ matrix.distro }}_amd64
         path: ${{ env.PACKAGED_FILE }}
 
-  build-openwrt:
-    name: OpenWrt (${{ matrix.platform }})
+  build-openwrt-22:
+    name: OpenWrt 22.03 (${{ matrix.platform }})
     runs-on: ubuntu-22.04
     strategy:
       max-parallel: 6
@@ -338,5 +338,188 @@ jobs:
     - name: Upload OpenWrt Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.upload_name }}_openwrt
+        name: ${{ matrix.upload_name }}_openwrt_22
         path: ${{ env.IPK_PATH }}
+
+  build-openwrt-snapshot:
+    name: OpenWrt Snapshot (${{ matrix.platform }})
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 6
+      fail-fast: false
+      matrix:
+        include:
+          - target: ath79
+            subtarget: generic
+            platform: mips_24kc
+          - target: ramips
+            subtarget: mt7621
+            platform: mipsel_24kc
+          - target: mvebu
+            subtarget: cortexa53
+            platform: aarch64_cortex-a53
+          - target: mvebu
+            subtarget: cortexa72
+            platform: aarch64_cortex-a72
+          - target: mvebu
+            subtarget: cortexa9
+            platform: arm_cortex-a9_vfpv3-d16
+          - target: realtek
+            subtarget: rtl838x
+            platform: mips_4kec
+          - target: bcm63xx
+            subtarget: generic
+            platform: mips_mips32
+          - target: pistachio
+            subtarget: generic
+            platform: mipsel_24kc_24kf
+          - target: bcm47xx
+            subtarget: mips74k
+            platform: mipsel_74kc
+          - target: bcm47xx
+            subtarget: generic
+            platform: mipsel_mips32
+          - target: octeon
+            subtarget: generic
+            platform: mips64_octeonplus
+          - target: apm821xx
+            subtarget: nand
+            platform: powerpc_464fp
+          - target: mpc85xx
+            subtarget: p1010
+            platform: powerpc_8540
+          - target: layerscape
+            subtarget: armv8_64b
+            platform: aarch64_generic
+          - target: at91
+            subtarget: sam9x
+            platform: arm_arm926ej-s
+          - target: bcm27xx
+            subtarget: bcm2708
+            platform: arm_arm1176jzf-s_vfp
+          - target: armvirt
+            subtarget: 32
+            platform: arm_cortex-a15_neon-vfpv4
+          - target: at91
+            subtarget: sama5
+            platform: arm_cortex-a5_vfpv4
+          - target: mediatek
+            subtarget: mt7629
+            platform: arm_cortex-a7
+          - target: bcm27xx
+            subtarget: bcm2709
+            platform: arm_cortex-a7_neon-vfpv4
+          - target: omap
+            subtarget: generic
+            platform: arm_cortex-a8_vfpv3
+          - target: bcm53xx
+            subtarget: generic
+            platform: arm_cortex-a9
+          - target: imx
+            subtarget: cortexa9
+            platform: arm_cortex-a9_neon
+          - target: gemini
+            subtarget: generic
+            platform: arm_fa526
+          - target: oxnas
+            subtarget: ox820
+            platform: arm_mpcore
+          - target: kirkwood
+            subtarget: generic
+            platform: arm_xscale
+          - target: x86
+            subtarget: 64
+            platform: x86_64
+          - target: x86
+            subtarget: generic
+            platform: i386_pentium4
+          - target: x86
+            subtarget: geode
+            platform: i386_pentium-mmx
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Prepare build environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential curl file gawk gettext git libncurses5-dev libssl-dev python3 rsync subversion sudo swig unzip wget zlib1g-dev zstd
+
+    - name: Download SDK
+      run: |
+        BASE_URL="https://downloads.openwrt.org/snapshots/targets/${{ matrix.target }}/${{ matrix.subtarget }}/"
+        echo "Fetching SDK list from $BASE_URL"
+        
+        # Scrape the specific SDK filename (handling potential multiple matches by taking the first one)
+        # We look for files starting with openwrt-sdk- and ending with .tar.zst
+        SDK_FILE=$(curl -s "$BASE_URL" | grep -o 'openwrt-sdk-[^"]*\.tar\.zst' | head -n 1)
+        
+        if [ -z "$SDK_FILE" ]; then
+          echo "Error: Could not find SDK file at $BASE_URL"
+          echo "Debug info: Content of page:"
+          curl -s "$BASE_URL" | head -n 20
+          exit 1
+        fi
+        
+        echo "Found SDK: $SDK_FILE"
+        wget -q "$BASE_URL$SDK_FILE"
+        
+        # Extract
+        tar --zstd -xf "$SDK_FILE"
+        rm "$SDK_FILE"
+        # Move extracted SDK (folder name varies) to 'sdk'
+        mv openwrt-sdk-* sdk
+
+    - name: Configure SDK and Package
+      run: |
+        cd sdk
+        
+        # Prepare package directory for ps3netsrv
+        mkdir -p package/ps3netsrv
+        
+        # Copy OpenWrt Makefiles and patches
+        cp -r $GITHUB_WORKSPACE/openwrt/* package/ps3netsrv/
+        
+        # Copy actual source code to a subdirectory 'src_code' inside the package
+        mkdir -p package/ps3netsrv/src_code
+        cp $GITHUB_WORKSPACE/Makefile package/ps3netsrv/src_code/
+        cp $GITHUB_WORKSPACE/Makefile.linux package/ps3netsrv/src_code/
+        cp -r $GITHUB_WORKSPACE/include package/ps3netsrv/src_code/
+        cp -r $GITHUB_WORKSPACE/src package/ps3netsrv/src_code/
+        
+        # Switch to GitHub mirrors to avoid 503 errors (check if feeds.conf.default exists first)
+        if [ -f feeds.conf.default ]; then
+          sed -i 's|https://git.openwrt.org/feed/|https://github.com/openwrt/|g' feeds.conf.default
+          sed -i 's|https://git.openwrt.org/project/|https://github.com/openwrt/|g' feeds.conf.default
+          sed -i 's|https://git.openwrt.org/openwrt/|https://github.com/openwrt/|g' feeds.conf.default
+        fi
+
+        # Update feeds
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+        
+        make defconfig
+
+    - name: Build ps3netsrv
+      run: |
+        cd sdk
+        make package/ps3netsrv/compile V=s
+
+    - name: Prepare Artifact
+      run: |
+        # Find the .apk file (new format for snapshots in 25/24)
+        APK_FILE=$(find sdk/bin/packages -name "ps3netsrv*.apk" | head -n 1)
+        
+        if [ -z "$APK_FILE" ]; then
+            echo "Warning: No .apk found, checking for .ipk just in case..."
+            APK_FILE=$(find sdk/bin/packages -name "ps3netsrv*.ipk" | head -n 1)
+        fi
+        
+        echo "Found Package: $APK_FILE"
+        echo "APK_PATH=$APK_FILE" >> $GITHUB_ENV
+    
+    - name: Upload OpenWrt Snapshot Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ps3netsrv_${{ matrix.platform }}_openwrt_snapshot
+        path: ${{ env.APK_PATH }}
