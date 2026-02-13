@@ -2,6 +2,8 @@
 
 LuCI Support for `ps3netsrv`.
 
+<img width="1011" height="564" alt="image" src="https://github.com/user-attachments/assets/1bd2f42e-63cc-476d-b6ae-e8590fefc1b3" />
+
 This package provides a web interface for configuring `ps3netsrv` on OpenWrt. `ps3netsrv` allows you to stream games and ISOs over the network to your CFW PlayStation® 3 system.
 
 ## Features
