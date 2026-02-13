@@ -317,7 +317,7 @@ jobs:
       run: |
         cd sdk
         mkdir -p package/ps3netsrv
-        cp -r $GITHUB_WORKSPACE/openwrt/* package/ps3netsrv/
+        cp -r $GITHUB_WORKSPACE/openwrt/ps3netsrv/* package/ps3netsrv/
         mkdir -p package/ps3netsrv/src_code
         cp $GITHUB_WORKSPACE/Makefile package/ps3netsrv/src_code/
         cp $GITHUB_WORKSPACE/Makefile.linux package/ps3netsrv/src_code/
@@ -382,7 +382,7 @@ jobs:
       run: |
         cd sdk
         mkdir -p package/luci-app-ps3netsrv
-        cp -r $GITHUB_WORKSPACE/luci-app-ps3netsrv/* package/luci-app-ps3netsrv/
+        cp -r $GITHUB_WORKSPACE/openwrt/luci-app-ps3netsrv/* package/luci-app-ps3netsrv/
         
         # Switch to GitHub mirrors
         sed -i 's|https://git.openwrt.org/feed/|https://github.com/openwrt/|g' feeds.conf.default
