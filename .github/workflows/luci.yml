@@ -31,12 +31,9 @@ jobs:
         BASE_URL="https://downloads.openwrt.org/releases/24.10.5/targets/ath79/tiny/"
         SDK_FILE=$(curl -s "$BASE_URL" | grep -o 'openwrt-sdk-[^"]*\.tar\.[a-z]*' | head -n 1)
         wget -q "$BASE_URL$SDK_FILE"
-        if [[ "$SDK_FILE" == *.tar.zst ]]; then
-            tar --zstd -xf "$SDK_FILE"
-        else
-            tar -xf "$SDK_FILE"
-        fi
-        mv openwrt-sdk-* sdk
+        mkdir sdk
+        tar -xf "$SDK_FILE" -C sdk --strip-components=1
+        rm "$SDK_FILE"
 
     - name: Configure SDK and Package
       run: |
@@ -85,8 +82,9 @@ jobs:
         BASE_URL="https://downloads.openwrt.org/snapshots/targets/ath79/tiny/"
         SDK_FILE=$(curl -s "$BASE_URL" | grep -o 'openwrt-sdk-[^"]*\.tar\.zst' | head -n 1)
         wget -q "$BASE_URL$SDK_FILE"
-        tar --zstd -xf "$SDK_FILE"
-        mv openwrt-sdk-* sdk
+        mkdir sdk
+        tar --zstd -xf "$SDK_FILE" -C sdk --strip-components=1
+        rm "$SDK_FILE"
 
     - name: Configure SDK and Package
       run: |
