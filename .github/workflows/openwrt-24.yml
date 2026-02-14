@@ -20,6 +20,12 @@ jobs:
           - target: apm821xx
             subtarget: nand
             platform: apm821xx_nand
+          - target: stm32
+            subtarget: stm32mp1
+            platform: stm32_stm32mp1
+          - target: rockchip
+            subtarget: armv8
+            platform: rockchip_armv8
           - target: apm821xx
             subtarget: sata
             platform: apm821xx_sata
